@@ -71,14 +71,61 @@ export default function MarketDetailPage() {
             router.push('/login');
             return;
         }
+
+        const val = parseFloat(amount);
+        if (isNaN(val) || val <= 0) return;
+
         setPlacingBet(true);
 
-        // TODO: Connect to backend API/Edge Function to process bet securely
-        // For now, simluating success
-        await new Promise(r => setTimeout(r, 1000));
-        alert(`Aposta simulada de R$ ${amount} no ${selectedSide} enviada.`);
-        setPlacingBet(false);
-        setAmount('');
+        try {
+            // 1. Check Balance
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('balance')
+                .eq('id', user.id)
+                .single();
+
+            if (userError) throw userError;
+            if ((userData?.balance || 0) < val) {
+                alert("Saldo insuficiente! Faça um depósito na carteira.");
+                setPlacingBet(false);
+                return;
+            }
+
+            // 2. Insert Bet
+            const { error: betError } = await supabase.from('bets').insert({
+                user_id: user.id,
+                market_id: market.id,
+                side: selectedSide,
+                amount: val,
+                odds_at_entry: currentOdds,
+                potential_payout: potentialReturn,
+                status: 'ACTIVE'
+            });
+
+            if (betError) throw betError;
+
+            // 3. Update User Balance (Debit)
+            const { error: balanceError } = await supabase.rpc('decrement_balance', {
+                userid: user.id,
+                amount: val
+            });
+
+            if (balanceError) {
+                console.warn("RPC failed, trying manual update", balanceError);
+                await supabase.from('users').update({ balance: userData.balance - val }).eq('id', user.id);
+            }
+
+            alert(`Aposta de R$ ${amount} confirmada!`);
+            setAmount('');
+            fetchMarket(); // Refresh UI
+
+        } catch (err: any) {
+            console.error(err);
+            alert("Erro ao realizar aposta: " + err.message);
+        } finally {
+            setPlacingBet(false);
+        }
     }
 
     if (loading) return <div className="p-12 text-center">Carregando mercado...</div>;
