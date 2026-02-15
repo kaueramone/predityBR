@@ -33,15 +33,16 @@ export default function Header() {
     };
 
     return (
-        <header className="border-b border-surface bg-secondary/50 backdrop-blur-md sticky top-0 z-50">
-            <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Link href="/" className="flex items-center gap-2">
-                        <img src="/logo.png" alt="PredityBR Logo" className="w-8 h-8 rounded-full" />
-                        <span className="font-bold text-xl tracking-wider text-white">PREDITY<span className="text-primary">BR</span></span>
-                    </Link>
-                </div>
+        <header className="fixed top-0 left-0 right-0 z-50 bg-[#0f1115]/90 backdrop-blur-md border-b border-white/5 h-16 transition-all">
+            <div className="container mx-auto px-4 h-full flex items-center justify-between">
 
+                {/* Logo Area */}
+                <Link href="/" className="flex items-center gap-2">
+                    <img src="/logo.png" alt="PredityBR Logo" className="w-8 h-8 rounded-full" />
+                    <span className="font-bold text-lg tracking-wider text-white md:text-xl">PREDITY<span className="text-primary">BR</span></span>
+                </Link>
+
+                {/* Desktop Nav (Hidden on Mobile) */}
                 <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-400 items-center">
                     <Link href="/markets" className="hover:text-white transition-colors flex items-center gap-2">
                         <TrendingUp className="w-4 h-4" /> Mercados
@@ -49,41 +50,33 @@ export default function Header() {
                     <Link href="/wallet" className="hover:text-white transition-colors flex items-center gap-2">
                         <Wallet className="w-4 h-4" /> Carteira
                     </Link>
-                    {user && (
-                        <Link href="/admin" className="hover:text-white transition-colors flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4" /> Admin
-                        </Link>
-                    )}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                {/* Right Side: Auth / Balance */}
+                <div className="flex items-center gap-3">
                     {user ? (
-                        <div className="flex items-center gap-4">
-                            <Link href="/wallet" className="hidden md:flex items-center gap-2 bg-surface hover:bg-surface/80 px-3 py-1.5 rounded-full text-xs font-bold text-green-400 transition-colors border border-surface">
-                                <Wallet className="w-3 h-3" />
-                                <span>R$ 0,00</span> {/* TODO: Fetch real balance */}
+                        <>
+                            {/* Balance Badge (Visible Mobile & Desktop) */}
+                            <Link href="/wallet" className="flex items-center gap-2 bg-surface/50 hover:bg-surface border border-primary/20 hover:border-primary/50 px-3 py-1.5 rounded-full transition-all group">
+                                <span className="text-primary font-bold text-xs group-hover:text-primary/80">R$ 0,00</span>
+                                <div className="bg-primary text-white text-[10px] font-bold px-1.5 rounded">+</div>
                             </Link>
 
-                            <div className="flex items-center gap-3">
-                                <div className="text-right hidden md:block">
-                                    <div className="text-xs font-bold text-white">{user.user_metadata.full_name || 'Usuário'}</div>
-                                    <div className="text-[10px] text-gray-400 truncate max-w-[100px]">{user.email}</div>
+                            {/* Desktop Profile Info */}
+                            <div className="hidden md:flex items-center gap-3 ml-2 border-l border-white/10 pl-4">
+                                <div className="text-right">
+                                    <div className="text-xs font-bold text-white max-w-[100px] truncate">{user.user_metadata.full_name?.split(' ')[0]}</div>
                                 </div>
-                                <img
-                                    src={user.user_metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
-                                    alt="Avatar"
-                                    className="w-8 h-8 rounded-full bg-surface border border-surface"
-                                />
-                                <button onClick={handleLogout} className="text-gray-400 hover:text-white transition-colors" title="Sair">
-                                    <LogOut className="w-5 h-5" />
+                                <button onClick={handleLogout} className="text-gray-400 hover:text-white" title="Sair">
+                                    <LogOut className="w-4 h-4" />
                                 </button>
                             </div>
-                        </div>
-                    ) : (
-                        <>
-                            <Link href="/login" className="px-4 py-2 bg-surface hover:bg-surface/80 rounded text-sm font-medium transition-colors text-white">Login</Link>
-                            <Link href="/register" className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded text-sm font-bold transition-colors shadow-[0_0_15px_rgba(47,124,70,0.5)]">Criar Conta</Link>
                         </>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Link href="/login" className="px-3 py-1.5 text-xs font-bold text-gray-300 hover:text-white">Login</Link>
+                            <Link href="/register" className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded font-bold text-xs shadow-lg shadow-primary/20">Criar Conta</Link>
+                        </div>
                     )}
                 </div>
             </div>
