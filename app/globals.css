@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Liebling';
+  src: url('/fonts/Liebling.woff2') format('woff2'),
+    url('/fonts/Liebling.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #0f1115;
   --foreground: #e2e8f0;
