@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"; // Fallback
 import "./globals.css";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
+import SupportChat from "@/components/SupportChat";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -26,6 +27,7 @@ export default function RootLayout({
                 </main>
 
                 <BottomNav />
+                <SupportChat />
 
                 <footer className="hidden md:block border-t border-surface py-8 mt-12 bg-secondary/30">
                     <div className="container mx-auto px-4 text-center text-sm text-gray-500">

@@ -51,27 +51,29 @@ export default function MarketDetailPage() {
     const calculateOdds = () => {
         if (!market) return { yes: 1.0, no: 1.0, probYes: 50, probNo: 50 };
 
-        const pool = market.total_pool > 0 ? market.total_pool : 1;
+        const pool = market.total_pool > 0 ? market.total_pool : 0;
         const yes = market.total_yes_amount > 0 ? market.total_yes_amount : 0;
         const no = market.total_no_amount > 0 ? market.total_no_amount : 0;
 
-        // Probabilities based on pool ratio
-        // If pool is empty, 50/50
-        let probYes = (yes / pool);
-        let probNo = (no / pool);
-
-        if (market.total_pool === 0) {
-            probYes = 0.5;
-            probNo = 0.5;
-        }
+        // Probabilities for display (Proportional)
+        // If 0 bets, 50/50
+        let probYes = (pool > 0) ? (yes / pool) : 0.5;
+        let probNo = (pool > 0) ? (no / pool) : 0.5;
 
         // House Edge 18% -> Payout Ratio 0.82
         const houseEdgeInv = 0.82;
 
-        // Odds = 1 / Probability * HouseEdge
-        // Safety check for 0 prob
-        const oddsYes = probYes > 0 ? (1 / probYes) * houseEdgeInv : 2.0;
-        const oddsNo = probNo > 0 ? (1 / probNo) * houseEdgeInv : 2.0;
+        // Odds Formula: (TotalPool * 0.82) / SideAmount
+        // Verification: If I bet 10 on YES. Total Pool becomes X.
+        // My Payout Share = (10 / TotalYes) * (TotalPool * 0.82)
+        // Implied Odd = Payout / Bet = (TotalPool * 0.82) / TotalYes.
+
+        // Handle empty sides to avoid division by zero or infinite odds
+        // If side is empty, we can show a default header odd (e.g. 2.0 or 1.0)
+        // or calculate based on the first unit bet? 
+        // For display, let's use the current ratio. 
+        const oddsYes = yes > 0 ? (pool * houseEdgeInv) / yes : 1.64; // Fallback or 2.0 * 0.82
+        const oddsNo = no > 0 ? (pool * houseEdgeInv) / no : 1.64;
 
         return {
             yes: oddsYes,
@@ -94,13 +96,14 @@ export default function MarketDetailPage() {
 
         try {
             // 1. Check Balance again
-            const { data: userData } = await supabase
+            const { data: userData, error: userError } = await supabase
                 .from('users')
                 .select('balance')
                 .eq('id', user.id)
                 .single();
+            if (userError || !userData) throw userError || new Error("User data not found");
 
-            if ((userData?.balance || 0) < val) {
+            if ((userData.balance || 0) < val) {
                 alert("Saldo insuficiente! Faça um depósito na carteira.");
                 setPlacingBet(false);
                 return;
@@ -122,8 +125,16 @@ export default function MarketDetailPage() {
 
             if (betError) throw betError;
 
-            // 3. Update User Balance
-            await supabase.from('users').update({ balance: userData.balance - val }).eq('id', user.id);
+            // 3. Update User Balance (Debit)
+            const { error: balanceError } = await supabase.rpc('decrement_balance', {
+                userid: user.id,
+                amount: val
+            });
+
+            if (balanceError) {
+                console.warn("RPC failed, trying manual update", balanceError);
+                await supabase.from('users').update({ balance: userData.balance - val }).eq('id', user.id);
+            }
 
             alert(`Aposta confirmada! Potencial de R$ ${potentialReturn.toFixed(2)}`);
             setAmount('');

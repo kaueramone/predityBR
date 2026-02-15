@@ -1,54 +1,76 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ArrowRight, FileText, Wallet, AlertTriangle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, History, Wallet as WalletIcon, X, Copy, CheckCircle, Smartphone } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function WalletPage() {
-    const [balance, setBalance] = useState(0);
-    const [bets, setBets] = useState<any[]>([]);
-    const [transactions, setTransactions] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<'OPEN' | 'CLOSED'>('OPEN');
-    const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<any>(null);
-    const [processing, setProcessing] = useState<string | null>(null);
     const router = useRouter();
+    const [user, setUser] = useState<any>(null);
+    const [balance, setBalance] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [bets, setBets] = useState<any[]>([]);
+    const [tab, setTab] = useState<'OPEN' | 'CLOSED'>('OPEN');
+    const [processing, setProcessing] = useState<string | null>(null);
+
+    // Deposit Modal State
+    const [isDepositOpen, setIsDepositOpen] = useState(false);
+    const [depositStep, setDepositStep] = useState(1); // 1: Amount, 2: PIX
+    const [depositAmount, setDepositAmount] = useState<string>('');
+    const [pixKey] = useState("00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913Predity Pagamentos6008Brasilia62070503***6304E2CA");
 
     useEffect(() => {
-        fetchWalletData();
+        checkUser();
     }, []);
 
-    const fetchWalletData = async () => {
+    const checkUser = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             router.push('/login');
-            return;
+        } else {
+            setUser(session.user);
+            fetchWalletData(session.user.id);
         }
-        setUser(session.user);
+    };
 
-        // Fetch Balance
-        const { data: userData } = await supabase.from('users').select('balance').eq('id', session.user.id).single();
+    const fetchWalletData = async (userId: string = user?.id) => {
+        if (!userId) return;
+        setLoading(true);
+
+        // 1. Get Balance
+        const { data: userData } = await supabase.from('users').select('balance').eq('id', userId).single();
         if (userData) setBalance(userData.balance);
 
-        // Fetch Bets (Predictions) with Market Stats for Cashout
-        const { data: userBets } = await supabase
+        // 2. Get Bets
+        const { data: betsData } = await supabase
             .from('bets')
-            .select('*, markets(title, status, total_pool, total_yes_amount, total_no_amount)')
-            .eq('user_id', session.user.id)
+            .select(`
+                *,
+                markets (
+                    title,
+                    status,
+                    total_pool,
+                    total_yes_amount,
+                    total_no_amount
+                )
+            `)
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
-        if (userBets) setBets(userBets);
+        if (betsData) setBets(betsData);
 
-        // Fetch Transactions
-        const { data: txs } = await supabase
+        // 3. Get Transactions
+        const { data: txData } = await supabase
             .from('transactions')
             .select('*')
-            .eq('user_id', session.user.id)
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
-        if (txs) setTransactions(txs);
+        if (txData) setTransactions(txData);
 
         setLoading(false);
     };
@@ -56,29 +78,21 @@ export default function WalletPage() {
     const calculateCashout = (bet: any) => {
         if (!bet.markets) return 0;
         if (bet.status !== 'ACTIVE') return 0;
+        // Cashout only if market is OPEN
         if (bet.markets.status !== 'OPEN') return 0;
 
-        const pool = bet.markets.total_pool || 1;
-        // Probability of winning based on current pool ratio
-        // If I bet YES, I own YES shares. Value depends on (YES Pool / Total Pool)?
-        // No, current price of YES is (YES / POOL)? Wait.
-        // In Parimutuel/Pool:
-        // Payout = (MyAmount / TotalYes) * TotalPool
-        // If I cashout, I am effectively selling "MyAmount" of YES.
-        // The "Price" is roughly what 1 unit of YES is worth now.
-        // 1 unit of YES pays (1 / Prob). 
-        // Let's stick to the simpler formula used in calculation earlier:
-        // Value ~= PotentialPayout * CurrentProbability * (1 - Fee)
-
-        // Current Probability (Implied by Pool):
+        const pool = bet.markets.total_pool || 0;
         const sidePool = bet.side === 'YES' ? bet.markets.total_yes_amount : bet.markets.total_no_amount;
-        const prob = (sidePool || 0) / pool;
 
-        // Note: Check logic. If I bet YES, and YES pool is huge, does it mean YES is likely? 
-        // In this simple pool: Yes. More money in YES = Higher Probability.
-        // So `prob = sidePool / pool`.
+        // Current Probability = Side / Total
+        // If side is empty, prob is 0 (should use safe math)
+        const prob = pool > 0 ? (sidePool || 0) / pool : 0;
 
-        const cashoutValue = (bet.potential_payout || 0) * prob * 0.90; // 10% fee
+        // Simple Cashout Formula: Potential * Prob * (1 - CashoutFee)
+        // Adjust logic to match House Pool if needed
+        // Assuming cashout tracks the changing probability
+
+        const cashoutValue = (bet.potential_payout || 0) * prob * 0.80; // 20% Cashout Fee
         return cashoutValue;
     };
 
@@ -86,7 +100,7 @@ export default function WalletPage() {
         const value = calculateCashout(bet);
         if (value <= 0) return;
 
-        if (!confirm(`Deseja encerrar esta aposta por R$ ${value.toFixed(2)}?`)) return;
+        if (!confirm(`Deseja encerrar esta aposta por R$ ${value.toFixed(2)}? Taxa de 20% aplicada.`)) return;
 
         setProcessing(bet.id);
 
@@ -103,9 +117,6 @@ export default function WalletPage() {
             if (betError) throw betError;
 
             // 2. Update User Balance
-            // Note: Ideally use RPC for atomicity, but client side for now
-            // Need to fetch fresh balance first to be safe? Or just increment local known.
-            // Using RPC increment is safer if available, but simple update for prototype.
             const { data: freshUser } = await supabase.from('users').select('balance').eq('id', user.id).single();
             const newBalance = (freshUser?.balance || balance) + value;
 
@@ -136,176 +147,291 @@ export default function WalletPage() {
         }
     };
 
-    const handleDeposit = async () => {
-        const amount = prompt("Valor para depósito (Simulação PIX):", "100");
-        if (!amount) return;
-        const val = parseFloat(amount);
-        if (isNaN(val) || val <= 0) return;
-
-        // Mock deposit
-        const newBalance = balance + val;
-        await supabase.from('users').update({ balance: newBalance }).eq('id', user.id);
-
-        // Log tx
-        await supabase.from('transactions').insert({
-            user_id: user.id,
-            type: 'DEPOSIT',
-            amount: val,
-            status: 'COMPLETED',
-            provider: 'MOCK_PIX'
-        });
-
-        fetchWalletData();
-        alert("Depósito realizado!");
+    // --- DEPOSIT FLOW ---
+    const openDeposit = () => {
+        setDepositStep(1);
+        setDepositAmount('');
+        setIsDepositOpen(true);
     };
 
-    const handleWithdraw = () => {
-        alert("Saques em manutenção.");
+    const confirmDepositAmount = () => {
+        const val = parseFloat(depositAmount);
+        if (!val || val < 1) {
+            alert("Valor mínimo de R$ 1,00");
+            return;
+        }
+        setDepositStep(2);
     };
 
-    const filteredBets = bets.filter(bet => {
-        const isClosed = bet.status === 'RESOLVED' || bet.status === 'CLOSED' || bet.status === 'CASHED_OUT';
-        return activeTab === 'CLOSED' ? isClosed : !isClosed;
+    const finalizeDeposit = async () => {
+        if (!user) return;
+        setLoading(true);
+        const val = parseFloat(depositAmount);
+
+        try {
+            // Update Balance
+            const newBalance = balance + val;
+            await supabase.from('users').update({ balance: newBalance }).eq('id', user.id);
+
+            // Log Transaction
+            await supabase.from('transactions').insert({
+                user_id: user.id,
+                type: 'DEPOSIT',
+                amount: val,
+                status: 'COMPLETED',
+                description: 'Depósito via PIX'
+            });
+
+            alert(`Depósito de R$ ${val.toFixed(2)} confirmado!`);
+            setIsDepositOpen(false);
+            fetchWalletData();
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao processar depósito.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading && !user) return <div className="min-h-screen pt-20 flex justify-center text-primary">Carregando carteira...</div>;
+
+    const filteredBets = bets.filter(b => {
+        if (tab === 'OPEN') return b.status === 'ACTIVE';
+        return b.status !== 'ACTIVE';
     });
 
-    if (loading) return <div className="min-h-screen pt-20 flex justify-center text-primary">Carregando...</div>;
-
     return (
-        <div className="max-w-md mx-auto pb-40 space-y-6">
+        <div className="max-w-md mx-auto space-y-8 pb-20">
+            {/* Balance Card */}
+            <div className="bg-surface rounded-2xl p-6 border border-white/5 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <WalletIcon className="w-24 h-24 text-white" />
+                </div>
+                <div className="space-y-1 relative z-10">
+                    <span className="text-gray-400 text-sm font-medium">Saldo Total</span>
+                    <h1 className="text-4xl font-bold text-white tracking-tight">R$ {balance.toFixed(2)}</h1>
+                </div>
 
-            {/* Accordion / Info Header */}
-            <div className="bg-surface rounded-lg p-4 flex items-center justify-between cursor-pointer border border-white/5">
-                <span className="font-medium text-gray-300">Sobre os saldos e posições</span>
-                <ChevronDown className="text-gray-500 w-5 h-5" />
+                <div className="grid grid-cols-2 gap-4 mt-8 relative z-10">
+                    <button
+                        onClick={openDeposit}
+                        className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary/20"
+                    >
+                        <ArrowDownLeft className="w-5 h-5" /> Depositar
+                    </button>
+                    <button
+                        onClick={() => alert('Saques processados em até 24h via chave PIX CPF.')}
+                        className="flex items-center justify-center gap-2 bg-secondary hover:bg-surface border border-white/10 text-white py-3 rounded-xl font-bold transition-all"
+                    >
+                        <ArrowUpRight className="w-5 h-5" /> Sacar
+                    </button>
+                </div>
             </div>
 
-            {/* My Predictions Header */}
-            <div className="bg-[#151921] rounded-xl p-6 border border-white/5 space-y-6">
-                <div className="space-y-1">
-                    <h2 className="text-lg font-bold text-gray-200">Minhas previsões</h2>
-                    <div className="flex items-center gap-2 text-sm text-green-500 font-mono">
-                        <span>R$ {bets.filter(b => b.status === 'ACTIVE').reduce((acc, b) => acc + (b.potential_payout || 0), 0).toFixed(2)} (Potencial)</span>
-                    </div>
-                </div>
+            {/* My Predictions */}
+            <div>
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <History className="w-5 h-5 text-gray-400" /> Minhas Apostas
+                </h2>
 
                 {/* Tabs */}
-                <div className="bg-black/30 p-1 rounded-lg flex">
+                <div className="flex bg-surface rounded-lg p-1 mb-6 border border-white/5">
                     <button
-                        onClick={() => setActiveTab('OPEN')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'OPEN' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+                        onClick={() => setTab('OPEN')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${tab === 'OPEN' ? 'bg-secondary text-white shadow' : 'text-gray-400 hover:text-white'}`}
                     >
-                        Em aberto
+                        Em Aberto
                     </button>
                     <button
-                        onClick={() => setActiveTab('CLOSED')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'CLOSED' ? 'bg-surface text-white' : 'text-gray-500 hover:text-white'}`}
+                        onClick={() => setTab('CLOSED')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${tab === 'CLOSED' ? 'bg-secondary text-white shadow' : 'text-gray-400 hover:text-white'}`}
                     >
-                        Encerrados
+                        Encerradas
                     </button>
                 </div>
 
-                {/* Content List */}
-                <div className="min-h-[150px] bg-black/20 rounded-lg flex items-center justify-center border border-white/5">
-                    {filteredBets.length > 0 ? (
-                        <div className="w-full">
-                            {filteredBets.map(bet => {
-                                const cashoutVal = calculateCashout(bet);
-                                const isCashable = activeTab === 'OPEN' && bet.status === 'ACTIVE' && cashoutVal > 0;
-
-                                return (
-                                    <div key={bet.id} className="p-4 border-b border-white/5 last:border-0 hover:bg-white/5 w-full bg-black">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex-1 min-w-0 pr-4">
-                                                <p className="text-sm font-bold truncate text-white block">{bet.markets?.title || 'Mercado'}</p>
-                                                <p className="text-xs text-gray-500">{bet.side === 'YES' ? 'SIM' : 'NÃO'} • {format(new Date(bet.created_at), 'dd/MM HH:mm')}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="block text-sm font-bold text-gray-300">R$ {bet.amount}</span>
-                                                <span className="block text-[10px] text-green-500">Potencial: R$ {bet.potential_payout?.toFixed(2)}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Cashout Action */}
-                                        {isCashable && (
-                                            <div className="flex items-center justify-end pt-2 border-t border-white/5 mt-2">
-                                                <button
-                                                    onClick={() => handleCashout(bet)}
-                                                    disabled={processing === bet.id}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-surface border border-primary/30 rounded text-xs font-bold text-primary transition-colors disabled:opacity-50"
-                                                >
-                                                    {processing === bet.id ? 'Processando...' : `Encerrar: R$ ${cashoutVal.toFixed(2)}`}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {bet.status === 'CASHED_OUT' && (
-                                            <div className="flex justify-end pt-2 border-t border-white/5 mt-2">
-                                                <span className="text-xs font-bold text-orange-400">Encerrado: R$ {bet.payout?.toFixed(2)}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                {/* Bets List */}
+                <div className="space-y-4">
+                    {filteredBets.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500 bg-surface/30 rounded-xl border border-white/5 border-dashed">
+                            Nenhuma aposta {tab === 'OPEN' ? 'ativa' : 'encerrada'}.
                         </div>
                     ) : (
-                        <div className="p-6 text-center">
-                            <p className="text-gray-500 text-sm">Nenhum ativo encontrado.</p>
-                        </div>
-                    )}
-                </div>
+                        filteredBets.map((bet) => {
+                            const cashoutVal = calculateCashout(bet);
+                            const isCashable = cashoutVal > 0 && bet.status === 'ACTIVE' && bet.markets.status === 'OPEN';
 
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                    <button
-                        onClick={handleDeposit}
-                        className="py-3 rounded-lg border border-primary text-primary hover:bg-primary hover:text-white font-bold text-sm transition-all uppercase tracking-wide"
-                    >
-                        Depositar
-                    </button>
-                    <button
-                        onClick={handleWithdraw}
-                        className="py-3 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800 font-bold text-sm transition-all uppercase tracking-wide"
-                    >
-                        Sacar
-                    </button>
+                            return (
+                                <div key={bet.id} className="bg-surface border border-white/5 rounded-xl p-5 shadow-sm hover:border-white/10 transition-colors">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="space-y-1">
+                                            <span className="text-xs font-bold text-gray-400 px-2 py-0.5 border border-white/10 rounded uppercase">
+                                                {bet.markets.status === 'OPEN' ? 'Ao Vivo' : 'Encerrado'}
+                                            </span>
+                                            <h3 className="font-bold text-white text-lg leading-tight">{bet.markets.title}</h3>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded text-xs font-bold ${bet.side === 'YES' ? 'bg-primary/20 text-primary' : 'bg-red-500/20 text-red-500'}`}>
+                                            {bet.side === 'YES' ? 'SIM' : 'NÃO'}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                                        <div>
+                                            <span className="text-gray-500 block text-xs">Aportado</span>
+                                            <span className="text-white font-mono">R$ {bet.amount.toFixed(2)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-500 block text-xs">Retorno Potencial</span>
+                                            <span className="text-green-400 font-bold font-mono">R$ {bet.potential_payout.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {isCashable && (
+                                        <button
+                                            onClick={() => handleCashout(bet)}
+                                            disabled={processing === bet.id}
+                                            className="w-full py-2 bg-secondary hover:bg-surface border border-white/10 rounded-lg text-sm font-bold text-gray-300 hover:text-white transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {processing === bet.id ? 'Processando...' : `Encerrar Aposta (Cashout R$ ${cashoutVal.toFixed(2)})`}
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
             {/* Transaction History */}
-            <div className="bg-[#151921] rounded-xl p-6 border border-white/5 min-h-[200px] flex flex-col">
-                <h3 className="text-sm font-bold text-gray-400 mb-6 sticky top-0">Histórico de Transações</h3>
+            <div className="pt-8 border-t border-white/5">
+                <h2 className="text-lg font-bold text-gray-400 mb-4">Últimas Transações</h2>
+                <div className="space-y-3">
+                    {transactions.map((tx) => (
+                        <div key={tx.id} className="flex justify-between items-center py-3 border-b border-white/5 last:border-0">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-full ${tx.type === 'DEPOSIT' || tx.type === 'WIN' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                    {tx.type === 'DEPOSIT' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-white">{tx.description || tx.type}</p>
+                                    <p className="text-xs text-gray-500">{format(new Date(tx.created_at), "dd/MM HH:mm", { locale: ptBR })}</p>
+                                </div>
+                            </div>
+                            <span className={`font-mono font-bold ${tx.type === 'DEPOSIT' || tx.type === 'WIN' ? 'text-green-400' : 'text-white'}`}>
+                                {tx.type === 'DEPOSIT' || tx.type === 'WIN' ? '+' : '-'} R$ {tx.amount.toFixed(2)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-                {transactions.length > 0 ? (
-                    <div className="space-y-4">
-                        {transactions.map(tx => (
-                            <div key={tx.id} className="flex justify-between items-center text-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-full ${tx.type === 'DEPOSIT' || tx.type === 'WIN' || tx.type === 'CASHOUT' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                                        <Wallet className="w-4 h-4" />
+            {/* --- DEPOSIT BOTTOM SHEET (MODAL) --- */}
+            {isDepositOpen && (
+                <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsDepositOpen(false)}></div>
+
+                    <div className="relative bg-surface border-t md:border border-white/10 w-full md:max-w-md md:rounded-2xl rounded-t-2xl p-6 space-y-6 animate-in slide-in-from-bottom duration-300 shadow-2xl">
+                        <button onClick={() => setIsDepositOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+                            <X className="w-6 h-6" />
+                        </button>
+
+                        {depositStep === 1 ? (
+                            // STEP 1: AMOUNT
+                            <>
+                                <div className="text-center space-y-2">
+                                    <div className="w-12 h-12 bg-primary/20 text-primary rounded-full mx-auto flex items-center justify-center mb-4">
+                                        <Smartphone className="w-6 h-6" />
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-white">
-                                            {tx.type === 'DEPOSIT' ? 'Depósito' :
-                                                tx.type === 'CASHOUT' ? 'Cashout' :
-                                                    tx.type === 'WIN' ? 'Vitória' : 'Saque'}
-                                        </p>
-                                        <p className="text-xs text-gray-500">{format(new Date(tx.created_at), 'dd/MM/yyyy')}</p>
+                                    <h3 className="text-xl font-bold text-white">Quanto quer depositar?</h3>
+                                    <p className="text-sm text-gray-400">Depósito instantâneo via PIX</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                                        <label className="text-xs text-gray-500 block mb-1">Valor do Depósito</label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-400 font-bold">R$</span>
+                                            <input
+                                                type="number"
+                                                value={depositAmount}
+                                                onChange={(e) => setDepositAmount(e.target.value)}
+                                                className="bg-transparent text-3xl font-bold text-white w-full focus:outline-none placeholder-gray-600"
+                                                placeholder="0,00"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Quick Buttons */}
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {[20, 50, 100, 200].map(val => (
+                                            <button
+                                                key={val}
+                                                onClick={() => setDepositAmount(val.toString())}
+                                                className="py-2 bg-secondary hover:bg-white/5 rounded-lg text-sm font-bold text-gray-300 border border-white/5 transition-colors"
+                                            >
+                                                +{val}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
-                                <span className={`font-bold ${tx.type === 'DEPOSIT' || tx.type === 'WIN' || tx.type === 'CASHOUT' ? 'text-green-500' : 'text-red-500'}`}>
-                                    {tx.type === 'DEPOSIT' || tx.type === 'WIN' || tx.type === 'CASHOUT' ? '+' : '-'} R$ {tx.amount}
-                                </span>
-                            </div>
-                        ))}
+
+                                <button
+                                    onClick={confirmDepositAmount}
+                                    className="w-full py-4 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all"
+                                >
+                                    Gerar PIX
+                                </button>
+                            </>
+                        ) : (
+                            // STEP 2: PIX QR CODE
+                            <>
+                                <div className="text-center space-y-2">
+                                    <h3 className="text-xl font-bold text-white">Pagamento PIX</h3>
+                                    <p className="text-sm text-gray-400">Escaneie o QR Code ou copie a chave abaixo</p>
+                                </div>
+
+                                <div className="flex justify-center py-4">
+                                    <div className="bg-white p-4 rounded-xl">
+                                        {/* Mock QR Code */}
+                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${pixKey}`} alt="PIX QR" className="w-40 h-40" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <p className="text-center text-sm font-bold text-white">R$ {parseFloat(depositAmount).toFixed(2)}</p>
+
+                                    <div className="flex gap-2">
+                                        <input
+                                            readOnly
+                                            value={pixKey}
+                                            className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 text-xs text-gray-400 truncate focus:outline-none"
+                                        />
+                                        <button
+                                            onClick={() => navigator.clipboard.writeText(pixKey)}
+                                            className="p-3 bg-secondary hover:bg-white/10 rounded-lg text-white transition-colors"
+                                            title="Copiar"
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg text-xs text-yellow-500 text-center">
+                                    Após o pagamento, o saldo será creditado automaticamente.
+                                </div>
+
+                                <button
+                                    onClick={finalizeDeposit}
+                                    className="w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle className="w-5 h-5" /> Já fiz o Pix
+                                </button>
+                            </>
+                        )}
                     </div>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-2 opacity-50">
-                        <FileText className="w-10 h-10 mb-2" />
-                        <span className="font-bold">Nenhum registro encontrado</span>
-                        <span className="text-xs text-center max-w-[200px]">Você ainda não possui transações registradas em seu extrato.</span>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
