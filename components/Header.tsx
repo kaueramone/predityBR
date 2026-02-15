@@ -41,15 +41,17 @@ export default function Header() {
                     <img src="/logo.png" alt="PredityBR Logo" className="h-10 w-auto" />
                 </Link>
 
-                {/* Desktop Nav (Hidden on Mobile) */}
-                <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-400 items-center">
-                    <Link href="/markets" className="hover:text-white transition-colors flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" /> Mercados
-                    </Link>
-                    <Link href="/wallet" className="hover:text-white transition-colors flex items-center gap-2">
-                        <Wallet className="w-4 h-4" /> Carteira
-                    </Link>
-                </nav>
+                {/* Desktop Nav (Hidden on Mobile, Visible only if Logged In) */}
+                {user && (
+                    <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-400 items-center">
+                        <Link href="/markets" className="hover:text-white transition-colors flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" /> Mercados
+                        </Link>
+                        <Link href="/wallet" className="hover:text-white transition-colors flex items-center gap-2">
+                            <Wallet className="w-4 h-4" /> Carteira
+                        </Link>
+                    </nav>
+                )}
 
                 {/* Right Side: Auth / Balance */}
                 <div className="flex items-center gap-3">
