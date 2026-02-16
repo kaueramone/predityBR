@@ -236,7 +236,7 @@ export default function MarketDetailPage() {
             </div>
 
             {/* Betting Interface */}
-            <div className="fixed bottom-0 left-0 right-0 bg-[#0f1115] border-t border-white/10 p-4 pb-24 md:pb-4 z-40">
+            <div className="fixed bottom-0 left-0 right-0 bg-[#0f1115] border-t border-white/10 p-4 pb-24 md:pb-4 z-50">
                 <div className="max-w-md mx-auto space-y-4">
                     {/* Outcome Selector */}
                     <div className="flex bg-surface rounded-lg p-1 border border-white/5">

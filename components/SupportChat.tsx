@@ -19,9 +19,7 @@ export default function SupportChat({ user: initialUser }: { user: User | null }
         return () => subscription.unsubscribe();
     }, [initialUser]);
 
-    const [messages, setMessages] = useState<{ from: 'user' | 'agent', text: string }[]>([
-        { from: 'agent', text: 'Olá! Bem-vindo ao suporte da PredityBR. Como posso ajudar você hoje?' }
-    ]);
+    const [messages, setMessages] = useState<any[]>([]);
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -31,22 +29,68 @@ export default function SupportChat({ user: initialUser }: { user: User | null }
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Load Messages & Subscribe
+    useEffect(() => {
+        if (!user || !isOpen) return;
+
+        const fetchMessages = async () => {
+            const { data } = await supabase
+                .from('support_messages')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: true });
+            if (data) setMessages(data);
+        };
+
+        fetchMessages();
+
+        const channel = supabase
+            .channel('support_chat')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'support_messages',
+                    filter: `user_id=eq.${user.id}`
+                },
+                (payload) => {
+                    setMessages((prev) => [...prev, payload.new]);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user, isOpen]);
+
     useEffect(() => {
         if (isOpen) {
             scrollToBottom();
         }
     }, [messages, isOpen]);
 
-    const handleSend = () => {
-        if (!input.trim()) return;
+    const handleSend = async () => {
+        if (!input.trim() || !user) return;
 
-        setMessages(prev => [...prev, { from: 'user', text: input }]);
-        setInput("");
+        const text = input;
+        setInput(""); // Optimistic clear
 
-        // Mock response
-        setTimeout(() => {
-            setMessages(prev => [...prev, { from: 'agent', text: 'Um de nossos atendentes entrará em contato em breve.' }]);
-        }, 1000);
+        try {
+            const { error } = await supabase.from('support_messages').insert({
+                user_id: user.id,
+                message: text,
+                sender: 'user'
+            });
+
+            if (error) throw error;
+            // Subscription will update UI
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao enviar mensagem.");
+            setInput(text); // Revert on error
+        }
     };
 
     // Only render if user exists, but Hooks must run first
@@ -84,12 +128,12 @@ export default function SupportChat({ user: initialUser }: { user: User | null }
                         {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {messages.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] p-3 rounded-lg text-sm leading-relaxed ${msg.from === 'user'
+                                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] p-3 rounded-lg text-sm leading-relaxed ${msg.sender === 'user'
                                         ? 'bg-primary text-white rounded-tr-none'
                                         : 'bg-surface text-gray-300 rounded-tl-none'
                                         }`}>
-                                        {msg.text}
+                                        {msg.message}
                                     </div>
                                 </div>
                             ))}
