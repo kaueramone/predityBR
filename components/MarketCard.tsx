@@ -14,9 +14,10 @@ interface MarketCardProps {
     pool: number;
     yesAmount: number;
     noAmount: number;
+    metadata?: any;
 }
 
-export default function MarketCard({ id, title, category, imageUrl, endDate, pool, yesAmount, noAmount }: MarketCardProps) {
+export default function MarketCard({ id, title, category, imageUrl, endDate, pool, yesAmount, noAmount, metadata }: MarketCardProps) {
     // Simple odds calc
     const safePool = pool > 0 ? pool : 1;
     const probYes = (yesAmount || 0) / safePool;

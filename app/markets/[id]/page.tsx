@@ -192,7 +192,14 @@ export default function MarketDetailPage() {
                     {/* YES */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-end">
-                            <span className="font-bold text-primary text-lg">SIM</span>
+                            <div className="flex items-center gap-3">
+                                {market.metadata?.yes_image ? (
+                                    <img src={market.metadata.yes_image} alt="Sim" className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-surface border border-white/10 flex items-center justify-center text-[10px] text-gray-500">IMG</div>
+                                )}
+                                <span className="font-bold text-primary text-lg">SIM</span>
+                            </div>
                             <span className="font-mono text-2xl text-white">{odds.probYes}%</span>
                         </div>
                         <div className="h-3 w-full bg-black/50 rounded-full overflow-hidden">
@@ -207,7 +214,14 @@ export default function MarketDetailPage() {
                     {/* NO */}
                     <div className="space-y-2 pt-2">
                         <div className="flex justify-between items-end">
-                            <span className="font-bold text-red-500 text-lg">NÃO</span>
+                            <div className="flex items-center gap-3">
+                                {market.metadata?.no_image ? (
+                                    <img src={market.metadata.no_image} alt="Não" className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-surface border border-white/10 flex items-center justify-center text-[10px] text-gray-500">IMG</div>
+                                )}
+                                <span className="font-bold text-red-500 text-lg">NÃO</span>
+                            </div>
                             <span className="font-mono text-2xl text-white">{odds.probNo}%</span>
                         </div>
                         <div className="h-3 w-full bg-black/50 rounded-full overflow-hidden">

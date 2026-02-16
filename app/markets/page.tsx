@@ -69,8 +69,8 @@ export default function MarketsPage() {
                             key={cat}
                             onClick={() => setFilter(cat)}
                             className={`pb-3 text-sm font-bold whitespace-nowrap transition-all border-b-2 px-1 ${filter === cat
-                                    ? "border-primary text-primary"
-                                    : "border-transparent text-gray-400 hover:text-white"
+                                ? "border-primary text-primary"
+                                : "border-transparent text-gray-400 hover:text-white"
                                 }`}
                         >
                             {cat}
@@ -99,6 +99,7 @@ export default function MarketsPage() {
                             pool={market.total_pool || 0}
                             yesAmount={market.total_yes_amount || 0}
                             noAmount={market.total_no_amount || 0}
+                            metadata={market.metadata}
                         />
                     ))}
 
