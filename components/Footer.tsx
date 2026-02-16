@@ -34,8 +34,9 @@ export default function Footer() {
 
                 {/* Column 2 */}
                 <div>
-                    <h4 className="font-bold text-white mb-4">Suporte</h4>
+                    <h3 className="font-bold text-white mb-4">Suporte</h3>
                     <ul className="space-y-2 text-sm text-gray-500">
+                        <li><Link href="/como-funciona" className="hover:text-primary transition-colors flex items-center gap-2"><HelpCircle className="w-3 h-3" /> Como funciona?</Link></li>
                         <li><Link href="/help" className="hover:text-primary transition-colors flex items-center gap-2"><HelpCircle className="w-3 h-3" /> Central de Ajuda</Link></li>
                         <li><Link href="/contact" className="hover:text-primary transition-colors flex items-center gap-2"><Mail className="w-3 h-3" /> Fale Conosco</Link></li>
                         <li><Link href="/fees" className="hover:text-primary transition-colors flex items-center gap-2"><DollarSign className="w-3 h-3" /> Taxas e Limites</Link></li>
