@@ -41,13 +41,13 @@ export default function AdminLayout({
     }, [router]);
 
     const menuItems = [
-        { label: "Visão Geral", icon: LayoutDashboard, href: "/admin" },
-        { label: "Usuários", icon: Users, href: "/admin/users" },
-        { label: "Financeiro", icon: Wallet, href: "/admin/finance" },
-        { label: "Apostas", icon: List, href: "/admin/bets" },
-        { label: "Segurança", icon: Shield, href: "/admin/security" },
-        { label: "Atividades", icon: Activity, href: "/admin/activity" },
-        { label: "Suporte", icon: LifeBuoy, href: "/admin/support" },
+        { label: "Visão Geral", icon: LayoutDashboard, href: "/app/admin" },
+        { label: "Usuários", icon: Users, href: "/app/admin/users" },
+        { label: "Financeiro", icon: Wallet, href: "/app/admin/finance" },
+        { label: "Apostas", icon: List, href: "/app/admin/bets" },
+        { label: "Segurança", icon: Shield, href: "/app/admin/security" },
+        { label: "Atividades", icon: Activity, href: "/app/admin/activity" },
+        { label: "Suporte", icon: LifeBuoy, href: "/app/admin/support" },
     ];
 
     if (loading) return <div className="min-h-screen bg-[#0f1115]" />;

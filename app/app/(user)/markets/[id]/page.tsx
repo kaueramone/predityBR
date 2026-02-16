@@ -160,7 +160,7 @@ export default function MarketDetailPage() {
         <div className="max-w-md mx-auto pb-40">
             {/* Navbar / Header */}
             <div className="flex items-center justify-between py-4 mb-4">
-                <Link href="/markets" className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors">
+                <Link href="/app/markets" className="p-2 -ml-2 text-gray-400 hover:text-white transition-colors">
                     <ArrowLeft className="w-6 h-6" />
                 </Link>
                 <div className="flex gap-4">

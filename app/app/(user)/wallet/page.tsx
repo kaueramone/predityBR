@@ -353,8 +353,13 @@ export default function WalletPage() {
                                             <span className="text-gray-400 font-bold">R$</span>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={depositAmount}
-                                                onChange={(e) => setDepositAmount(e.target.value)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (parseFloat(val) < 0) return; // Prevent negative
+                                                    setDepositAmount(val);
+                                                }}
                                                 className="bg-transparent text-3xl font-bold text-white w-full focus:outline-none placeholder-gray-600"
                                                 placeholder="0,00"
                                                 autoFocus

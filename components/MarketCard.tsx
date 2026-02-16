@@ -30,7 +30,7 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
     const endsIn = formatDistanceToNow(new Date(endDate), { addSuffix: true, locale: ptBR });
 
     return (
-        <Link href={`/markets/${id}`} className="block group">
+        <Link href={`/app/markets/${id}`} className="block group">
             <div className="bg-surface/30 border border-surface hover:border-primary/50 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col h-full">
                 {/* Header / Image Area */}
                 <div className="relative h-40 bg-gray-800">
@@ -63,7 +63,7 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                             {metadata?.yes_image ? (
                                 <img src={metadata.yes_image} alt="Sim" className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
                             ) : (
-                                <div className="w-8 h-8 rounded-full bg-surface border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-gray-500">
+                                <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/50 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-green-500 font-bold">
                                     S
                                 </div>
                             )}
@@ -86,7 +86,7 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                             {metadata?.no_image ? (
                                 <img src={metadata.no_image} alt="Não" className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
                             ) : (
-                                <div className="w-8 h-8 rounded-full bg-surface border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-gray-500">
+                                <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/50 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-red-500 font-bold">
                                     N
                                 </div>
                             )}

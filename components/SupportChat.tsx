@@ -3,7 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Paperclip } from 'lucide-react';
 
-export default function SupportChat() {
+import { User } from '@supabase/supabase-js';
+
+export default function SupportChat({ user }: { user: User | null }) {
+    if (!user) return null;
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<{ from: 'user' | 'agent', text: string }[]>([
         { from: 'agent', text: 'Olá! Bem-vindo ao suporte da PredityBR. Como posso ajudar você hoje?' }
@@ -67,8 +70,8 @@ export default function SupportChat() {
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[80%] p-3 rounded-lg text-sm leading-relaxed ${msg.from === 'user'
-                                            ? 'bg-primary text-white rounded-tr-none'
-                                            : 'bg-surface text-gray-300 rounded-tl-none'
+                                        ? 'bg-primary text-white rounded-tr-none'
+                                        : 'bg-surface text-gray-300 rounded-tl-none'
                                         }`}>
                                         {msg.text}
                                     </div>

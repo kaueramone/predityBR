@@ -7,25 +7,43 @@ import { User } from '@supabase/supabase-js';
 import { LogOut, User as UserIcon, Wallet, TrendingUp, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-export default function Header() {
-    const [user, setUser] = useState<User | null>(null);
+export default function Header({ user: initialUser }: { user: User | null }) {
     const router = useRouter();
+    const [user, setUser] = useState<User | null>(initialUser);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
-        });
+        // Sync state with prop if it changes (rare in root layout but good practice)
+        setUser(initialUser);
+    }, [initialUser]);
 
-        // Listen for auth changes
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+    useEffect(() => {
+        // Check Admin Status
+        const checkRole = async (uid: string) => {
+            const { data } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', uid)
+                .single();
+            if (data?.role === 'ADMIN') setIsAdmin(true);
+        };
+
+        if (user) checkRole(user.id);
+
+        // Listen for auth changes (Login/Logout)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null);
+            setIsAdmin(false);
+            if (session?.user) {
+                checkRole(session.user.id);
+            } else {
+                // If logout, ensure we verify
+                setIsAdmin(false);
+            }
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [user?.id]); // specific dependency to avoid loops
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -37,31 +55,28 @@ export default function Header() {
             <div className="container mx-auto px-4 h-full flex items-center justify-between">
 
                 {/* Logo Area */}
-                <Link href="/" className="flex items-center gap-2">
+                <Link href={user ? "/app/markets" : "/"} className="flex items-center gap-2">
                     <img src="/logo.png" alt="PredityBR Logo" className="h-10 w-auto" />
                 </Link>
 
-                {/* Desktop Nav (Hidden on Mobile, Visible only if Logged In) */}
-                {user && (
-                    <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-400 items-center">
-                        <Link href="/markets" className="hover:text-white transition-colors flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" /> Mercados
-                        </Link>
-                        <Link href="/wallet" className="hover:text-white transition-colors flex items-center gap-2">
-                            <Wallet className="w-4 h-4" /> Carteira
-                        </Link>
-                    </nav>
-                )}
+
 
                 {/* Right Side: Auth / Balance */}
                 <div className="flex items-center gap-3">
                     {user ? (
                         <>
                             {/* Balance Badge (Visible Mobile & Desktop) */}
-                            <Link href="/wallet" className="flex items-center gap-2 bg-surface/50 hover:bg-surface border border-primary/20 hover:border-primary/50 px-3 py-1.5 rounded-full transition-all group">
+                            <Link href="/app/wallet" className="flex items-center gap-2 bg-surface/50 hover:bg-surface border border-primary/20 hover:border-primary/50 px-3 py-1.5 rounded-full transition-all group">
                                 <span className="text-primary font-bold text-xs group-hover:text-primary/80">R$ 0,00</span>
                                 <div className="bg-primary text-white text-[10px] font-bold px-1.5 rounded">+</div>
                             </Link>
+
+                            {isAdmin && (
+                                <Link href="/app/admin" className="hidden md:flex items-center gap-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/50 px-3 py-1.5 rounded-full transition-all group">
+                                    <ShieldCheck className="w-4 h-4 text-purple-400" />
+                                    <span className="text-purple-400 font-bold text-xs group-hover:text-purple-300">Painel Admin</span>
+                                </Link>
+                            )}
 
                             {/* Desktop Profile Info */}
                             <div className="hidden md:flex items-center gap-3 ml-2 border-l border-white/10 pl-4">

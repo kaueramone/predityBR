@@ -39,7 +39,7 @@ export default function AdminBetsPage() {
                     <h1 className="text-2xl font-bold text-white">Gerenciar Apostas</h1>
                     <p className="text-gray-400 text-sm">Crie, edite e resolva os mercados de apostas.</p>
                 </div>
-                <Link href="/admin/bets/new" className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
+                <Link href="/app/admin/bets/new" className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
                     <Plus className="w-4 h-4" /> Nova Aposta
                 </Link>
             </div>
@@ -102,8 +102,8 @@ export default function AdminBetsPage() {
                                         </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${market.status === 'OPEN' ? 'bg-green-500/10 text-green-500' :
-                                                    market.status === 'RESOLVED' ? 'bg-blue-500/10 text-blue-500' :
-                                                        'bg-red-500/10 text-red-500'
+                                                market.status === 'RESOLVED' ? 'bg-blue-500/10 text-blue-500' :
+                                                    'bg-red-500/10 text-red-500'
                                                 }`}>
                                                 {market.status === 'OPEN' ? 'Aberta' : market.status === 'RESOLVED' ? 'Resolvida' : 'Fechada'}
                                             </span>
@@ -118,14 +118,9 @@ export default function AdminBetsPage() {
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button title="Editar" className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
+                                                <Link href={`/app/admin/bets/${market.id}`} className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
                                                     <Edit className="w-4 h-4" />
-                                                </button>
-                                                {market.status !== 'RESOLVED' && (
-                                                    <button title="Resolver" className="p-2 hover:bg-green-500/20 rounded text-green-500 hover:text-green-400 transition-colors">
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                                </Link>
                                             </div>
                                         </td>
                                     </tr>

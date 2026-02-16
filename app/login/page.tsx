@@ -26,7 +26,7 @@ export default function LoginPage() {
 
             if (error) throw error;
 
-            router.push('/');
+            router.push('/app/markets');
             router.refresh(); // Refresh to update auth state in UI
         } catch (err: any) {
             setError(err.message === "Invalid login credentials" ? "Email ou senha incorretos." : err.message);

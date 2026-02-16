@@ -25,13 +25,13 @@ export default function BottomNav() {
     if (!isAuthenticated) return null;
 
     const navItems = [
-        { label: 'Mercados', href: '/markets', icon: TrendingUp },
-        { label: 'Saldo', href: '/wallet', icon: Wallet },
-        { label: 'Perfil', href: '/profile', icon: UserIcon }, // Assuming /profile or we reuse /admin for now? User asked for Profile page update. Let's point to /profile and we will create it.
+        { label: 'Mercados', href: '/app/markets', icon: TrendingUp },
+        { label: 'Saldo', href: '/app/wallet', icon: Wallet },
+        { label: 'Perfil', href: '/app/profile', icon: UserIcon },
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#0f1115] border-t border-white/10 px-6 py-3 z-50 md:hidden">
+        <div className="fixed bottom-0 left-0 right-0 bg-[#0f1115] border-t border-white/10 px-6 py-3 z-50">
             <div className="flex justify-between items-center max-w-md mx-auto">
                 {navItems.map(({ label, href, icon: Icon }) => {
                     const isActive = pathname === href;

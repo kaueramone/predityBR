@@ -26,38 +26,6 @@ export default function NewBetPage() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleImageUpload = async (e: any, field: string) => {
-        try {
-            const file = e.target.files?.[0];
-            if (!file) return;
-
-            setUploading(true);
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${new Date().getTime()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const filePath = `${fileName}`;
-
-            // Upload to Supabase Storage (Bucket: 'images')
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                console.error("Upload error details:", uploadError);
-                throw new Error("Falha ao fazer upload. Verifique se o bucket 'images' existe e é público.");
-            }
-
-            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, [field]: data.publicUrl }));
-
-        } catch (error: any) {
-            console.error(error);
-            alert("Erro no upload: " + error.message);
-        } finally {
-            setUploading(false);
-        }
-    };
-
     const handleSubmit = async (e: any) => {
         e.preventDefault();
         setLoading(true);
@@ -69,27 +37,52 @@ export default function NewBetPage() {
                 return;
             }
 
-            const { error } = await supabase.from('markets').insert({
+            // Validate Images (Check for blob URLs which indicate failed/pending uploads)
+            if (formData.image_url.startsWith('blob:') ||
+                formData.yes_image_url.startsWith('blob:') ||
+                formData.no_image_url.startsWith('blob:')) {
+                alert("Algumas imagens não foram enviadas corretamentes (ainda estão como prévia 'blob:').\n\nPor favor, aguarde o upload terminar ou tente enviar novamente.");
+                setLoading(false);
+                return;
+            }
+
+            // Get Current User
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                throw new Error("Usuário não autenticado.");
+            }
+
+            // Create Timeout Promise (10s)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Tempo limite de conexão excedido (10s). Verifique sua internet ou permissões.')), 10000)
+            );
+
+            // Create Insert Promise
+            const insertPromise = supabase.from('markets').insert({
                 title: formData.title,
                 description: formData.description,
                 category: formData.category,
                 end_date: new Date(formData.end_date).toISOString(),
                 image_url: formData.image_url,
                 metadata: {
-                    yes_image: formData.yes_image_url,
-                    no_image: formData.no_image_url
+                    yes_image: formData.yes_image_url || '', // Ensure empty string if null
+                    no_image: formData.no_image_url || ''
                 },
                 status: 'OPEN',
                 total_pool: 0,
                 total_yes_amount: 0,
                 total_no_amount: 0,
-                created_by: 'ADMIN'
+                created_by: user.id
             });
+
+            // Race Condition
+            const { error }: any = await Promise.race([insertPromise, timeoutPromise]);
 
             if (error) throw error;
 
             alert("Aposta criada com sucesso!");
-            router.push('/admin/bets');
+            router.push('/app/admin/bets');
 
         } catch (error: any) {
             console.error("Error creating bet:", error);
@@ -99,10 +92,56 @@ export default function NewBetPage() {
         }
     };
 
+    const handleImageUpload = async (e: any, field: string) => {
+        try {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            // Immediate Preview (Local) but track it's loading
+            const objectUrl = URL.createObjectURL(file);
+            setFormData(prev => ({ ...prev, [field]: objectUrl }));
+
+            setUploading(true);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${new Date().getTime()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // Upload with Timeout Race (Increased to 45s)
+            const uploadPromise = supabase.storage
+                .from('images')
+                .upload(filePath, file);
+
+            // 45 seconds timeout
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Tempo limite de upload excedido (45s). Verifique sua conexão ou se o bucket existe.')), 45000)
+            );
+
+            const result: any = await Promise.race([uploadPromise, timeoutPromise]);
+
+            if (result.error) {
+                console.error("Upload error details:", result.error);
+                throw new Error("Falha no upload (Supabase): " + result.error.message);
+            }
+
+            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+
+            // Update with Real URL
+            setFormData(prev => ({ ...prev, [field]: data.publicUrl }));
+
+        } catch (error: any) {
+            console.error(error);
+            alert("Erro no upload: " + error.message + "\n\nA prévia foi removida. Tente novamente.");
+            // Revert the failed field to empty to prevent saving bad data
+            setFormData(prev => ({ ...prev, [field]: '' }));
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center gap-4">
-                <Link href="/admin/bets" className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <Link href="/app/admin/bets" className="p-2 hover:bg-white/10 rounded-full transition-colors">
                     <ArrowLeft className="w-5 h-5 text-gray-400" />
                 </Link>
                 <h1 className="text-2xl font-bold text-white">Nova Aposta</h1>
@@ -278,7 +317,7 @@ export default function NewBetPage() {
                 </div>
 
                 <div className="pt-4 border-t border-white/5 flex items-center justify-end gap-4">
-                    <Link href="/admin/bets" className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white transition-colors">
+                    <Link href="/app/admin/bets" className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white transition-colors">
                         Cancelar
                     </Link>
                     <button
@@ -286,7 +325,7 @@ export default function NewBetPage() {
                         disabled={loading || uploading}
                         className="px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
-                        {loading ? 'Salvando...' : <><Save className="w-5 h-5" /> Criar Aposta</>}
+                        {loading ? 'Salvando...' : uploading ? 'Enviando Imagem...' : <><Save className="w-5 h-5" /> Criar Aposta</>}
                     </button>
                 </div>
 
