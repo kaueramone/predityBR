@@ -18,7 +18,8 @@ export default function NewBetPage() {
         image_url: '',
         yes_image_url: '',
         no_image_url: '',
-        initial_pool: 0
+        initial_pool: 0,
+        outcomes: ['SIM', 'NÃO'] // Default Logic
     });
 
     const handleChange = (e: any) => {
@@ -59,18 +60,35 @@ export default function NewBetPage() {
             );
 
             // Create Insert Promise
+            const outcomes = formData.outcomes.filter(o => o.trim() !== ''); // Filter empty
+            if (outcomes.length < 2) {
+                alert("É necessário pelo menos 2 opções de aposta.");
+                setLoading(false);
+                return;
+            }
+
+            // Init pools
+            const outcomePools = outcomes.reduce((acc: any, curr: string) => {
+                acc[curr] = 0;
+                return acc;
+            }, {});
+
             const insertPromise = supabase.from('markets').insert({
                 title: formData.title,
                 description: formData.description,
                 category: formData.category,
                 end_date: new Date(formData.end_date).toISOString(),
                 image_url: formData.image_url,
+                outcomes: outcomes, // JSONB array
+                outcome_pools: outcomePools, // JSONB object
                 metadata: {
-                    yes_image: formData.yes_image_url || '', // Ensure empty string if null
+                    yes_image: formData.yes_image_url || '',
                     no_image: formData.no_image_url || ''
+                    // Future: outcome_images map
                 },
                 status: 'OPEN',
                 total_pool: 0,
+                // Deprecated but keep for now just in case
                 total_yes_amount: 0,
                 total_no_amount: 0,
                 created_by: user.id
@@ -210,6 +228,48 @@ export default function NewBetPage() {
                                 required
                             />
                         </div>
+                    </div>
+
+                    {/* Dynamic Outcomes */}
+                    <div className="space-y-4 pt-4 border-t border-white/5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-white">Opções de Aposta</h3>
+                            <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, outcomes: [...prev.outcomes, ''] }))}
+                                className="text-xs bg-primary/20 text-primary px-3 py-1 rounded hover:bg-primary/30 transition-colors"
+                            >
+                                + Adicionar Opção
+                            </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {formData.outcomes.map((outcome, index) => (
+                                <div key={index} className="flex gap-2">
+                                    <input
+                                        value={outcome}
+                                        onChange={(e) => {
+                                            const newOutcomes = [...formData.outcomes];
+                                            newOutcomes[index] = e.target.value;
+                                            setFormData(prev => ({ ...prev, outcomes: newOutcomes }));
+                                        }}
+                                        type="text"
+                                        placeholder={`Opção ${index + 1}`}
+                                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary"
+                                    />
+                                    {formData.outcomes.length > 2 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, outcomes: prev.outcomes.filter((_, i) => i !== index) }))}
+                                            className="px-3 text-red-500 hover:bg-white/5 rounded"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-500">* Mínimo de 2 opções obrigatórias.</p>
                     </div>
                 </div>
 

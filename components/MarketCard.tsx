@@ -16,10 +16,12 @@ interface MarketCardProps {
     pool: number;
     yesAmount: number;
     noAmount: number;
+    outcomes?: string[]; // New
+    outcomePools?: Record<string, number>; // New
     metadata?: any;
 }
 
-export default function MarketCard({ id, title, category, imageUrl, endDate, pool, yesAmount, noAmount, metadata }: MarketCardProps) {
+export default function MarketCard({ id, title, category, imageUrl, endDate, pool, yesAmount, noAmount, outcomes, outcomePools, metadata }: MarketCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [ticker, setTicker] = useState<{ id: number, value: number, type: 'yes' | 'no', top: number, left: number }[]>([]);
 
@@ -146,24 +148,52 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                     </div>
 
                     {/* Odds & Buttons - The "Meat" of the card */}
+                    {/* Odds & Buttons - Dynamic Outcomes */}
                     <div className="relative z-10 mt-auto grid grid-cols-2 gap-3">
-                        {/* YES Button */}
-                        <div className="bg-[#1E2530] hover:bg-[#1E2530]/80 border border-green-500/20 hover:border-green-500 rounded-lg p-2 text-center transition-all group/btn">
-                            <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Sim</div>
-                            <div className="text-2xl font-black text-green-500 group-hover/btn:scale-110 transition-transform">
-                                {oddsYes}x
-                            </div>
-                            <div className="text-[10px] text-gray-500">{yesPct}%</div>
-                        </div>
+                        {/* Dynamic Outcomes Mapping */}
+                        {(outcomes && outcomes.length > 0 ? outcomes : ['SIM', 'NÃO']).slice(0, 4).map((outcome) => {
+                            // Logic to get pool for this specific outcome
+                            let amount = outcomePools ? outcomePools[outcome] || 0 : 0;
 
-                        {/* NO Button */}
-                        <div className="bg-[#1E2530] hover:bg-[#1E2530]/80 border border-red-500/20 hover:border-red-500 rounded-lg p-2 text-center transition-all group/btn">
-                            <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Não</div>
-                            <div className="text-2xl font-black text-red-500 group-hover/btn:scale-110 transition-transform">
-                                {oddsNo}x
-                            </div>
-                            <div className="text-[10px] text-gray-500">{noPct}%</div>
-                        </div>
+                            // Fallback for Legacy Yes/No if pools are missing
+                            if (!outcomePools) {
+                                if ((outcome === 'SIM' || outcome === 'YES') && yesAmount) amount = yesAmount;
+                                if ((outcome === 'NÃO' || outcome === 'NO') && noAmount) amount = noAmount;
+                            }
+
+                            // Safe math
+                            const safeAmount = amount > 0 ? amount : 1;
+                            // Calculate Odds: Pool / OutcomeAmount. If outcome is huge, odds are low (1.01).
+                            const oddsVal = (safePool / safeAmount);
+                            const odds = (oddsVal < 1.01 ? 1.01 : oddsVal).toFixed(2);
+                            const pct = Math.round((safeAmount / safePool) * 100) || 0;
+
+                            // Color Logic
+                            let colors = 'border-gray-500/20 hover:border-gray-500 text-gray-500';
+                            let textColors = 'text-gray-400';
+
+                            const norm = outcome.toUpperCase();
+                            if (norm === 'SIM' || norm === 'YES') {
+                                colors = 'border-green-500/20 hover:border-green-500';
+                                textColors = 'text-green-500';
+                            } else if (norm === 'NÃO' || norm === 'NO') {
+                                colors = 'border-red-500/20 hover:border-red-500';
+                                textColors = 'text-red-500';
+                            } else {
+                                colors = 'border-blue-500/20 hover:border-blue-500';
+                                textColors = 'text-blue-500';
+                            }
+
+                            return (
+                                <div key={outcome} className={`bg-[#1E2530] hover:bg-[#1E2530]/80 border ${colors} rounded-lg p-2 text-center transition-all group/btn`}>
+                                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-1 truncate px-1" title={outcome}>{outcome}</div>
+                                    <div className={`text-2xl font-black ${textColors} group-hover/btn:scale-110 transition-transform`}>
+                                        {odds}x
+                                    </div>
+                                    <div className="text-[10px] text-gray-500">{pct}%</div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
