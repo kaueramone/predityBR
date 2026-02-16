@@ -19,8 +19,23 @@ export default function AdminLayout({
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 router.push('/login');
+                return;
             }
-            setLoading(false);
+
+            // Check Admin Role
+            const { data: profile, error } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', session.user.id)
+                .single();
+
+            // Allow access only if role is ADMIN
+            if (error || profile?.role !== 'ADMIN') {
+                console.warn("Acesso negado: Usuário não é admin", error);
+                router.push('/');
+            } else {
+                setLoading(false);
+            }
         };
         checkAuth();
     }, [router]);
