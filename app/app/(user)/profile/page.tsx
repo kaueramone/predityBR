@@ -112,12 +112,7 @@ export default function ProfilePage() {
                 Sair da conta
             </button>
 
-            {/* Support FAB (Floating Action Button style for WhatsApp as requested implicitly?) User showed green button in corner in print 1? Or maybe BottomNav covers it. Print 1 has a green chat bubble. */}
-            <div className="fixed bottom-20 right-4 z-40 md:bottom-8">
-                <button className="bg-green-500 hover:bg-green-600 text-white p-3 rounded-full shadow-lg transition-transform hover:scale-110 flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 fill-current" />
-                </button>
-            </div>
+
         </div>
     );
 }
