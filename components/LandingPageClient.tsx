@@ -121,7 +121,10 @@ export default function LandingPageClient({ featuredMarkets, heroCards }: Landin
                 </div>
             </main>
 
-            <Footer />
+            {/* Footer Wrapper to ensure visibility on mobile */}
+            <div className="relative z-10 bg-[#0f1115]">
+                <Footer />
+            </div>
         </div >
     );
 }
