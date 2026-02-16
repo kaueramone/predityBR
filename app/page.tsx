@@ -121,8 +121,8 @@ export default function LandingPage() {
             {/* 1. Banner Slider (Top) */}
             <div className="w-full bg-[#0f1115] pt-16 md:pt-20"> {/* Offset for Fixed Header */}
                 <div className="container mx-auto px-4">
-                    <div className="w-full max-h-[600px] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex items-center justify-center">
-                        <img src="/banner-pix.png" alt="Promo Banner" className="w-full h-full object-cover" />
+                    <div className="w-full h-[350px] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex items-center justify-center bg-[#0f1115]">
+                        <img src="/banner-pix.png" alt="Promo Banner" className="w-full h-full object-cover object-center" />
                     </div>
                 </div>
             </div>
