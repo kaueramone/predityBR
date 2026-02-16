@@ -3,26 +3,59 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Upload, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Upload } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewBetPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         category: 'POLÍTICA',
         end_date: '',
         image_url: '',
-        yes_image_url: '', // New field for outcome avatar
-        no_image_url: '',  // New field for outcome avatar
+        yes_image_url: '',
+        no_image_url: '',
         initial_pool: 0
     });
 
     const handleChange = (e: any) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageUpload = async (e: any, field: string) => {
+        try {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            setUploading(true);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${new Date().getTime()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // Upload to Supabase Storage (Bucket: 'images')
+            const { error: uploadError } = await supabase.storage
+                .from('images')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                console.error("Upload error details:", uploadError);
+                throw new Error("Falha ao fazer upload. Verifique se o bucket 'images' existe e é público.");
+            }
+
+            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+
+            setFormData(prev => ({ ...prev, [field]: data.publicUrl }));
+
+        } catch (error: any) {
+            console.error(error);
+            alert("Erro no upload: " + error.message);
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleSubmit = async (e: any) => {
@@ -36,24 +69,12 @@ export default function NewBetPage() {
                 return;
             }
 
-            // Insert Market
             const { error } = await supabase.from('markets').insert({
                 title: formData.title,
                 description: formData.description,
                 category: formData.category,
                 end_date: new Date(formData.end_date).toISOString(),
                 image_url: formData.image_url,
-                // We might need to store yes/no images in metadata if columns don't exist yet, 
-                // OR assuming we will add columns. For now, let's use a JSON metadata column or just ignore if schema not ready.
-                // Re-reading schema: User didn't provide schema but we are "creating" it. 
-                // Let's assume we can add these columns or put in 'metadata' json column.
-                // Checking previous context: No mention of metadata column.
-                // BEST APPROACH: Store in 'image_url' (cover) and maybe put others in description for now?
-                // OR better: Create the columns if possible. 
-                // Since I cannot run SQL easily, I will attempt to insert into 'metadata' column if it exists, or just omit for now and warn user.
-                // Wait, 'metadata' acts as a catch-all often.
-                // Let's try to add specific columns in a migration if I could, but I can't.
-                // JSONB 'metadata' is common.
                 metadata: {
                     yes_image: formData.yes_image_url,
                     no_image: formData.no_image_url
@@ -62,7 +83,7 @@ export default function NewBetPage() {
                 total_pool: 0,
                 total_yes_amount: 0,
                 total_no_amount: 0,
-                created_by: 'ADMIN' // or user.id
+                created_by: 'ADMIN'
             });
 
             if (error) throw error;
@@ -150,7 +171,6 @@ export default function NewBetPage() {
                                 required
                             />
                         </div>
-                        {/* Initial Pool Placeholder - for seeding logic if needed */}
                     </div>
                 </div>
 
@@ -158,66 +178,99 @@ export default function NewBetPage() {
                 <div className="space-y-4">
                     <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Imagens</h3>
 
+                    {/* Cover Image */}
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-gray-400 flex items-center gap-2">
-                            Imagem de Capa (URL) <span className="text-xs font-normal text-gray-600">(Recomendado: 600x400)</span>
+                            Imagem de Capa <span className="text-xs font-normal text-gray-600">(Upload ou URL)</span>
                         </label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                            <div className="relative flex-1">
+                                <input
+                                    type="file"
+                                    onChange={(e) => handleImageUpload(e, 'image_url')}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    accept="image/*"
+                                />
+                                <div className="bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-gray-400 flex justify-center items-center gap-2 hover:bg-white/5 transition-colors">
+                                    <Upload className="w-5 h-5" />
+                                    <span>{uploading ? 'Enviando...' : 'Clique para enviar imagem'}</span>
+                                </div>
+                            </div>
                             <input
                                 name="image_url"
                                 value={formData.image_url}
                                 onChange={handleChange}
                                 type="url"
-                                placeholder="https://..."
+                                placeholder="Ou cole a URL..."
                                 className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary"
                             />
-                            {formData.image_url && (
-                                <div className="w-12 h-12 rounded overflow-hidden border border-white/20">
-                                    <img src={formData.image_url} className="w-full h-full object-cover" />
-                                </div>
-                            )}
                         </div>
+                        {formData.image_url && (
+                            <div className="mt-2 w-full h-40 rounded md:w-64 overflow-hidden border border-white/20 bg-black">
+                                <img src={formData.image_url} className="w-full h-full object-cover" />
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
+                        {/* Yes Image */}
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-400 flex items-center gap-2">
-                                Avatar "SIM" (URL)
+                                Avatar "SIM"
                             </label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col gap-2">
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        onChange={(e) => handleImageUpload(e, 'yes_image_url')}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        accept="image/*"
+                                    />
+                                    <div className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-gray-400 flex justify-center items-center gap-2 hover:bg-white/5 transition-colors">
+                                        <Upload className="w-4 h-4" /> Importar
+                                    </div>
+                                </div>
                                 <input
                                     name="yes_image_url"
                                     value={formData.yes_image_url}
                                     onChange={handleChange}
                                     type="url"
-                                    placeholder="https://..."
-                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary"
+                                    placeholder="URL..."
+                                    className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-primary"
                                 />
                                 {formData.yes_image_url && (
-                                    <div className="w-12 h-12 rounded-full overflow-hidden border border-white/20">
-                                        <img src={formData.yes_image_url} className="w-full h-full object-cover" />
-                                    </div>
+                                    <img src={formData.yes_image_url} className="w-10 h-10 rounded-full object-cover border border-white/20 bg-black" />
                                 )}
                             </div>
                         </div>
 
+                        {/* No Image */}
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-400 flex items-center gap-2">
-                                Avatar "NÃO" (URL)
+                                Avatar "NÃO"
                             </label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col gap-2">
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        onChange={(e) => handleImageUpload(e, 'no_image_url')}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        accept="image/*"
+                                    />
+                                    <div className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-gray-400 flex justify-center items-center gap-2 hover:bg-white/5 transition-colors">
+                                        <Upload className="w-4 h-4" /> Importar
+                                    </div>
+                                </div>
                                 <input
                                     name="no_image_url"
                                     value={formData.no_image_url}
                                     onChange={handleChange}
                                     type="url"
-                                    placeholder="https://..."
-                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary"
+                                    placeholder="URL..."
+                                    className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-primary"
                                 />
                                 {formData.no_image_url && (
-                                    <div className="w-12 h-12 rounded-full overflow-hidden border border-white/20">
-                                        <img src={formData.no_image_url} className="w-full h-full object-cover" />
-                                    </div>
+                                    <img src={formData.no_image_url} className="w-10 h-10 rounded-full object-cover border border-white/20 bg-black" />
                                 )}
                             </div>
                         </div>
@@ -230,7 +283,7 @@ export default function NewBetPage() {
                     </Link>
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || uploading}
                         className="px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                         {loading ? 'Salvando...' : <><Save className="w-5 h-5" /> Criar Aposta</>}

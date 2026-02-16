@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -33,10 +35,10 @@ export default function AdminLayout({
         { label: "Suporte", icon: LifeBuoy, href: "/admin/support" },
     ];
 
-    if (loading) return null; // Or a spinner
+    if (loading) return <div className="min-h-screen bg-[#0f1115]" />;
 
     return (
-        <div className="flex min-h-screen pt-20"> {/* Added pt-20 for fixed header */}
+        <div className="flex min-h-screen pt-20">
             {/* Sidebar */}
             <aside className="w-64 border-r border-surface bg-secondary/20 hidden md:block fixed h-full left-0 top-20 bottom-0 overflow-y-auto">
                 <div className="p-6">
