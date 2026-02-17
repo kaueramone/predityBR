@@ -41,6 +41,24 @@ export default function AdminUsersPage() {
         }
     };
 
+    const toggleStatus = async (userId: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'BANNED' ? 'ACTIVE' : 'BANNED';
+        const action = currentStatus === 'BANNED' ? 'desbanir' : 'banir';
+
+        if (!confirm(`Tem certeza que deseja ${action} este usuário?`)) return;
+
+        const { error } = await supabase
+            .from('users')
+            .update({ status: newStatus })
+            .eq('id', userId);
+
+        if (error) {
+            alert("Erro ao atualizar status: " + error.message);
+        } else {
+            fetchUsers();
+        }
+    };
+
     const filteredUsers = users.filter(user =>
         (user.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,7 +95,7 @@ export default function AdminUsersPage() {
                         <thead className="bg-surface/50 text-gray-400 font-medium uppercase tracking-wider">
                             <tr>
                                 <th className="p-4">Usuário</th>
-                                <th className="p-4">Role</th>
+                                <th className="p-4">Role / Status</th>
                                 <th className="p-4">Saldo</th>
                                 <th className="p-4">Cadastro</th>
                                 <th className="p-4 text-right">Ações</th>
@@ -108,9 +126,14 @@ export default function AdminUsersPage() {
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${user.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' : 'bg-surface border border-white/10 text-gray-400'}`}>
-                                                {user.role || 'USER'}
-                                            </span>
+                                            <div className="flex flex-col gap-1 items-start">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${user.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-400' : 'bg-surface border border-white/10 text-gray-400'}`}>
+                                                    {user.role || 'USER'}
+                                                </span>
+                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.status === 'BANNED' ? 'bg-red-500/20 text-red-500' : 'text-green-500'}`}>
+                                                    {user.status || 'ACTIVE'}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="p-4 font-mono">
                                             <div className="flex items-center gap-1 text-green-400">
@@ -122,13 +145,22 @@ export default function AdminUsersPage() {
                                             {new Date(user.created_at).toLocaleDateString()}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <button
-                                                onClick={() => toggleRole(user.id, user.role)}
-                                                className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors"
-                                                title="Promover/Rebaixar"
-                                            >
-                                                <Shield className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => toggleRole(user.id, user.role)}
+                                                    className="p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors"
+                                                    title="Promover/Rebaixar (Admin)"
+                                                >
+                                                    <Shield className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => toggleStatus(user.id, user.status)}
+                                                    className={`p-2 hover:bg-white/10 rounded transition-colors ${user.status === 'BANNED' ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`}
+                                                    title={user.status === 'BANNED' ? "Desbanir Usuário" : "Banir Usuário"}
+                                                >
+                                                    <User className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
