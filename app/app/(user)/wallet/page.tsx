@@ -213,22 +213,11 @@ export default function WalletPage() {
         if (!user) return;
         const val = parseFloat(withdrawAmount);
 
-        // Min Withdraw Check
-        if (!val || val < 20) {
-            alert('Valor mínimo de saque: R$ 20,00');
-            return;
-        }
-        // Max Withdraw Check
-        if (val > 5000) {
-            alert("Limite máximo por operação: R$ 5.000,00");
-            return;
-        }
-        if (!withdrawPixKey) {
-            alert("Digite sua chave PIX.");
-            return;
-        }
+        if (!val || val < 20) { alert('Valor mínimo de saque: R$ 20,00'); return; }
+        if (val > 5000) { alert('Limite máximo por operação: R$ 5.000,00'); return; }
+        if (!withdrawPixKey) { alert('Digite sua chave PIX.'); return; }
 
-        const fee = 2.90; // Fixed Fee
+        const fee = 2.90;
         const totalDeduction = val + fee;
 
         if (totalDeduction > balance) {
@@ -236,38 +225,30 @@ export default function WalletPage() {
             return;
         }
 
-        if (!confirm(`Confirmar saque?\n\nValor: R$ ${val.toFixed(2)}\nTaxa Fixa: R$ ${fee.toFixed(2)}\nTotal Debitado: R$ ${totalDeduction.toFixed(2)}`)) return;
+        if (!confirm(`Confirmar saque via PIX?\n\nValor: R$ ${val.toFixed(2)}\nTaxa Fixa: R$ ${fee.toFixed(2)}\nTotal Debitado: R$ ${totalDeduction.toFixed(2)}\nChave PIX: ${withdrawPixKey}`)) return;
 
         setLoading(true);
         try {
-            // Update Balance
-            const newBalance = balance - totalDeduction;
-            await supabase.from('users').update({ balance: newBalance }).eq('id', user.id);
-
-            // Log Withdrawal
-            await supabase.from('transactions').insert({
-                user_id: user.id,
-                type: 'WITHDRAWAL',
-                amount: -val,
-                status: 'PENDING',
-                description: `Saque para ${withdrawPixKey}`
+            const res = await fetch('/api/withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: val,
+                    userId: user.id,
+                    pixKey: withdrawPixKey,
+                    pixKeyType: 'CPF', // default; could be dynamic
+                })
             });
+            const data = await res.json();
 
-            // Log Fee
-            await supabase.from('transactions').insert({
-                user_id: user.id,
-                type: 'FEE',
-                amount: -fee,
-                status: 'COMPLETED',
-                description: 'Taxa de Saque (Fixa)'
-            });
+            if (!res.ok) throw new Error(data.error || 'Falha ao processar saque');
 
-            alert("Solicitação de saque enviada com sucesso! Processamento em até 24h.");
+            alert(data.message || 'Saque solicitado com sucesso! Processamento em até 24h.');
             setIsWithdrawOpen(false);
             fetchWalletData();
 
         } catch (error: any) {
-            alert("Erro no saque: " + error.message);
+            alert('Erro no saque: ' + error.message);
         } finally {
             setLoading(false);
         }
