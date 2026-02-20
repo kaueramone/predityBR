@@ -37,7 +37,7 @@ export default function AdminFinancePage() {
     };
 
     const calculateStats = (data: any[]) => {
-        const deposits = data.filter(t => t.type === 'DEPOSIT').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+        const deposits = data.filter(t => t.type === 'DEPOSIT' && t.status === 'COMPLETED').reduce((acc, curr) => acc + (curr.amount || 0), 0);
         const withdrawals = data.filter(t => t.type === 'WITHDRAWAL' && t.status === 'COMPLETED').reduce((acc, curr) => acc + (curr.amount || 0), 0);
         const pending = data.filter(t => t.type === 'WITHDRAWAL' && t.status === 'PENDING').reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
@@ -177,8 +177,8 @@ export default function AdminFinancePage() {
                                     </td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${tx.type === 'DEPOSIT' ? 'bg-green-500/20 text-green-400' :
-                                                tx.type === 'WITHDRAWAL' ? 'bg-red-500/20 text-red-400' :
-                                                    'bg-blue-500/20 text-blue-400'
+                                            tx.type === 'WITHDRAWAL' ? 'bg-red-500/20 text-red-400' :
+                                                'bg-blue-500/20 text-blue-400'
                                             }`}>
                                             {tx.type}
                                         </span>
@@ -197,7 +197,7 @@ export default function AdminFinancePage() {
                                             </span>
                                         ) : (
                                             <span className="flex items-center gap-1 text-red-500">
-                                                <XCircle className="w-3 h-3" /> Falha
+                                                <XCircle className="w-3 h-3" /> Cancelado
                                             </span>
                                         )}
                                     </td>

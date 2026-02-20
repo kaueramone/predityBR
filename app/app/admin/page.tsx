@@ -48,7 +48,7 @@ export default function AdminDashboard() {
         // 2. Volume & Revenue Logic
         const { data: transactions } = await supabase
             .from('transactions')
-            .select('amount, type, created_at')
+            .select('amount, type, status, created_at')
             .order('created_at', { ascending: true });
 
         const volume = transactions
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
             .reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
 
         const revenue = transactions
-            ?.filter(t => t.type === 'DEPOSIT')
+            ?.filter(t => t.type === 'DEPOSIT' && t.status === 'COMPLETED')
             .reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
 
         // Revenue/Volume Chart Aggregation (Last 7 Days)
@@ -75,8 +75,8 @@ export default function AdminDashboard() {
         });
         const categoryData = Object.keys(categoryMap).map(name => ({ name, value: categoryMap[name] }));
 
-        // 4. Profit (5% of Volume)
-        const profit = volume * 0.05;
+        // 4. Profit (35% of Volume)
+        const profit = volume * 0.35;
 
         setStats({
             users: userCount || 0,
@@ -139,7 +139,7 @@ export default function AdminDashboard() {
                 <KpiCard title="Receita Total (Depósitos)" value={`R$ ${stats.revenue.toFixed(2)}`} change="-" isPositive icon={DollarSign} />
                 <KpiCard title="Usuários Cadastrados" value={stats.users} change="-" isPositive icon={Users} />
                 <KpiCard title="Volume Apostado" value={`R$ ${stats.volume.toFixed(2)}`} change="Estimado" isPositive={false} icon={TrendingUp} />
-                <KpiCard title="Lucro Estimado (5%)" value={`R$ ${stats.profit.toFixed(2)}`} change="Estimado" isPositive icon={Activity} />
+                <KpiCard title="Lucro Estimado (35%)" value={`R$ ${stats.profit.toFixed(2)}`} change="Estimado" isPositive icon={Activity} />
             </div>
 
             {/* Main Content Grid */}

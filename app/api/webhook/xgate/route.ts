@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // This endpoint receives notifications from XGate
 export async function POST(req: Request) {
@@ -8,11 +8,9 @@ export async function POST(req: Request) {
         const body = await req.json();
         console.log("XGate Webhook Body:", JSON.stringify(body, null, 2));
 
-        // Flexible parsing
         const id = body.id || body.transactionId || body.orderId || body.uuid;
         const status = (body.status || "").toUpperCase();
 
-        // Check if status indicates success
         const isPaid = status === 'PAID' || status === 'COMPLETED' || status === 'APPROVED' || status === 'SUCCEEDED';
 
         if (!isPaid) {
@@ -25,16 +23,25 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing ID" }, { status: 400 });
         }
 
-        // Find the transaction by external ID stored in metadata
-        // We try to match 'xgate_id' inside the metadata JSON column
-        const { data: tx, error: txError } = await supabase
+        // We MUST use the Service Role Key to bypass RLS in a webhook
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!serviceKey) {
+            console.error("[CRITICAL] SUPABASE_SERVICE_ROLE_KEY is missing! Webhook cannot bypass RLS to update balance.");
+            return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
+        }
+
+        const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey);
+
+        console.log("[Webhook] Querying transaction with xgate_id:", id);
+        // Using contains filter on JSONB column
+        const { data: tx, error: txError } = await supabaseAdmin
             .from('transactions')
             .select('*')
             .contains('metadata', { xgate_id: id })
             .single();
 
         if (txError || !tx) {
-            console.error("Transaction not found for ID:", id);
+            console.error("Transaction not found for ID:", id, txError);
             return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
         }
 
@@ -42,29 +49,35 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, message: "Already completed" });
         }
 
-        // Update Transaction Status
-        const { error: updateError } = await supabase
+        console.log(`[Webhook] Updating transaction ${tx.id} to COMPLETED`);
+        const { error: updateError } = await supabaseAdmin
             .from('transactions')
             .update({ status: 'COMPLETED' })
             .eq('id', tx.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+            console.error("Error updating transaction:", updateError);
+            throw updateError;
+        }
 
-        // Credit User Balance
-        // Fetch current balance first to be safe, or use an RPC increment function if available (recommended for concurrency)
-        // For now, we read-then-write
-        const { data: user, error: userError } = await supabase
+        console.log(`[Webhook] Fetching balance for user ${tx.user_id}`);
+        const { data: user, error: userError } = await supabaseAdmin
             .from('users')
             .select('balance')
             .eq('id', tx.user_id)
             .single();
 
         if (user && !userError) {
-            const newBalance = (user.balance || 0) + Number(tx.amount);
-            await supabase
+            const newBalance = (Number(user.balance) || 0) + Number(tx.amount);
+            console.log(`[Webhook] Updating balance from ${user.balance} to ${newBalance}`);
+            const { error: balanceError } = await supabaseAdmin
                 .from('users')
                 .update({ balance: newBalance })
                 .eq('id', tx.user_id);
+
+            if (balanceError) console.error("Error updating user balance:", balanceError);
+        } else {
+            console.error("Error fetching user for balance update:", userError);
         }
 
         return NextResponse.json({ received: true, status: 'COMPLETED' });
@@ -74,3 +87,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

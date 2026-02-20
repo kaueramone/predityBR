@@ -1,15 +1,8 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase'; // Ensure this points to server-side supabase client if needed, or use createClient
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { XGateService } from '@/lib/xgate';
-
-// NOTE: For server-side, it's better to use createClient from @supabase/ssr or similar, 
-// but reusing the existing lib/supabase (if it has service role) or just client (if RLS allows insert) 
-// might work. However, typically API routes should use a Service Role client to bypass RLS for admin tasks like status updates,
-// but for creating a "pending" transaction, the authenticated user (via headers) is fine.
-// Since we don't have the auth headers forwarded easily here without more setup, 
-// we'll assume the client calls this with their session or we just insert as "pending" with the userId provided.
-// Ideally, we should verify the user session here.
 
 export async function POST(req: Request) {
     try {
@@ -20,10 +13,50 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
         }
 
+        const cookieStore = await cookies();
+
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        return cookieStore.get(name)?.value;
+                    },
+                    set() { },
+                    remove() { }
+                }
+            }
+        );
+
+        // Fetch user details - NOW AUTHENTICATED VIA COOKIE
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !userData) {
+            console.error("User fetch error:", userError);
+            console.error("Searching for userId:", userId);
+
+            return NextResponse.json({
+                error: 'User not found or you are not logged in correctly. Please login again.',
+                details: userError
+            }, { status: 404 });
+        }
+
         // 1. Create Charge in XGate
         const xgateRes = await XGateService.createPixCharge({
             amount,
-            description: description || `Deposit for User ${userId}`
+            userId,
+            description: description || `Deposit for User ${userId}`,
+            user: {
+                name: userData.full_name || "Cliente Predity",
+                email: userData.email || "email@predity.com",
+                document: userData.document || undefined,
+                phone: userData.phone || undefined
+            }
         });
 
         if (!xgateRes.success) {
@@ -31,14 +64,17 @@ export async function POST(req: Request) {
         }
 
         const { data: xgateData } = xgateRes;
-        // Assuming xgateData contains: { id: "tx_123", qrCode: "...", ... }
-        // We need to verify the exact structure. For now, we map generic fields.
-        const externalId = xgateData.id || xgateData.transactionId || "unknown_id";
-        const qrCode = xgateData.qrCode || xgateData.payload || xgateData.pixKey || "";
-        const qrCodeImage = xgateData.qrCodeImage || ""; // If they return base64 image
+        const d = xgateData.data || xgateData;
+
+        const externalId = d.id || d.transactionId || d.orderId || d._id || "unknown_id";
+        const qrCode = d.code || d.qrCode || d.payload || d.pixKey || d.qrCodeText || d.paymentCode || d.pixCopiaECola || d.emv || d.codigoPix || "";
+        const qrCodeImage = d.qrCodeImage || d.qrCodeBase64 || d.image || d.imagemPix || "";
+
+        if (!qrCode) {
+            return NextResponse.json({ error: `Estrutura da resposta XGate: ${JSON.stringify(xgateData)}` }, { status: 500 });
+        }
 
         // 2. Log Transaction in Supabase
-        // We insert a new transaction with status 'PENDING'
         const { data: tx, error: dbError } = await supabase
             .from('transactions')
             .insert({
@@ -54,7 +90,17 @@ export async function POST(req: Request) {
 
         if (dbError) {
             console.error("DB Error:", dbError);
-            return NextResponse.json({ error: 'Failed to create transaction record' }, { status: 500 });
+            // If RLS blocks insert, we still return success with the PIX code so user can pay
+            // But we warn in console.
+            console.error("CRITICAL: Failed to save transaction in DB (RLS policy missing?). Returning PID code anyway.");
+            return NextResponse.json({
+                success: true,
+                qrCode,
+                qrCodeImage,
+                transactionId: "saved-failed-rls",
+                externalId,
+                warning: "Boleto gerado, mas transação não salva no histórico por falha de permissão."
+            });
         }
 
         return NextResponse.json({

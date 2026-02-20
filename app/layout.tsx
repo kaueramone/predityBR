@@ -12,6 +12,9 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
     title: "PredityBR - Realtime Prediction Markets",
     description: "Mercados de previsão em tempo real.",
+    icons: {
+        icon: '/favicon.png',
+    },
 };
 
 export default async function RootLayout({
