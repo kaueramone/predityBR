@@ -190,53 +190,87 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                         </h3>
                     </div>
 
-                    {/* Odds & Buttons - The "Meat" of the card */}
                     {/* Odds & Buttons - Dynamic Outcomes */}
-                    <div className="relative z-10 mt-auto grid grid-cols-2 gap-3">
-                        {/* Dynamic Outcomes Mapping */}
-                        {(outcomes && outcomes.length > 0 ? outcomes : ['SIM', 'NÃO']).slice(0, 4).map((outcome) => {
-                            // Logic to get pool for this specific outcome
-                            let amount = currentOutcomePools ? currentOutcomePools[outcome] || 0 : 0;
+                    <div className="relative z-10 mt-auto min-h-[80px]">
+                        {/* Calculate all outcomes first to sort them by probability/odds */}
+                        {(() => {
+                            const availableOutcomes = (outcomes && outcomes.length > 0) ? outcomes : ['SIM', 'NÃO'];
 
-                            // Fallback for Legacy Yes/No if pools are missing
-                            if (!currentOutcomePools) {
-                                if ((outcome === 'SIM' || outcome === 'YES') && currentYes) amount = currentYes;
-                                if ((outcome === 'NÃO' || outcome === 'NO') && currentNo) amount = currentNo;
-                            }
+                            const sortedStats = availableOutcomes.map(outcome => {
+                                let amount = currentOutcomePools ? currentOutcomePools[outcome] || 0 : 0;
+                                if (!currentOutcomePools) {
+                                    if ((outcome === 'SIM' || outcome === 'YES') && currentYes) amount = currentYes;
+                                    if ((outcome === 'NÃO' || outcome === 'NO') && currentNo) amount = currentNo;
+                                }
 
-                            // Safe math
-                            const safeAmount = amount > 0 ? amount : 1;
-                            // Calculate Odds: Pool / OutcomeAmount. If outcome is huge, odds are low (1.01).
-                            const oddsVal = (safePool / safeAmount);
-                            const odds = (oddsVal < 1.01 ? 1.01 : oddsVal).toFixed(2);
-                            const pct = Math.round((safeAmount / safePool) * 100) || 0;
+                                const safeAmount = amount > 0 ? amount : 1;
+                                const oddsVal = (safePool / safeAmount);
+                                const odds = (oddsVal < 1.01 ? 1.01 : oddsVal).toFixed(2);
+                                const pct = Math.round((safeAmount / safePool) * 100) || 0;
 
-                            // Color Logic
-                            let colors = 'border-gray-500/20 hover:border-gray-500 text-gray-500';
-                            let textColors = 'text-gray-400';
+                                let textColors = 'text-gray-400';
+                                let bgBarColor = 'bg-gray-500/20';
+                                const norm = outcome.toUpperCase();
+                                if (norm === 'SIM' || norm === 'YES') {
+                                    textColors = 'text-green-500'; bgBarColor = 'bg-green-500/20';
+                                } else if (norm === 'NÃO' || norm === 'NO') {
+                                    textColors = 'text-red-500'; bgBarColor = 'bg-red-500/20';
+                                } else {
+                                    textColors = 'text-blue-500'; bgBarColor = 'bg-blue-500/20';
+                                }
 
-                            const norm = outcome.toUpperCase();
-                            if (norm === 'SIM' || norm === 'YES') {
-                                colors = 'border-green-500/20 hover:border-green-500';
-                                textColors = 'text-green-500';
-                            } else if (norm === 'NÃO' || norm === 'NO') {
-                                colors = 'border-red-500/20 hover:border-red-500';
-                                textColors = 'text-red-500';
-                            } else {
-                                colors = 'border-blue-500/20 hover:border-blue-500';
-                                textColors = 'text-blue-500';
-                            }
+                                return { outcome, amount, odds, pct, textColors, bgBarColor };
+                            }).sort((a, b) => b.pct - a.pct); // Highest prob first
 
-                            return (
-                                <div key={outcome} className={`bg-[#1E2530] hover:bg-[#1E2530]/80 border ${colors} rounded-lg p-2 text-center transition-all group/btn`}>
-                                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-1 truncate px-1" title={outcome}>{outcome}</div>
-                                    <div className={`text-2xl font-black ${textColors} group-hover/btn:scale-110 transition-transform`}>
-                                        {odds}x
+                            if (availableOutcomes.length <= 2) {
+                                // DEFAULT GRID (Side-By-Side)
+                                return (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {sortedStats.map((stat) => (
+                                            <div key={stat.outcome} className={`bg-surface hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-lg p-2 text-center transition-all group/btn`}>
+                                                <div className="text-[10px] text-gray-400 uppercase font-bold mb-1 truncate px-1" title={stat.outcome}>{stat.outcome}</div>
+                                                <div className={`text-2xl font-black ${stat.textColors} group-hover/btn:scale-110 transition-transform`}>
+                                                    {stat.odds}x
+                                                </div>
+                                                <div className="text-[10px] text-gray-500">{stat.pct}%</div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="text-[10px] text-gray-500">{pct}%</div>
-                                </div>
-                            );
-                        })}
+                                );
+                            } else {
+                                // MULTI-OPTION LEADERBOARD
+                                const top3 = sortedStats.slice(0, 3);
+                                const remainingCount = sortedStats.length - 3;
+
+                                return (
+                                    <div className="space-y-1.5 flex flex-col justify-end">
+                                        {top3.map((stat, idx) => (
+                                            <div key={stat.outcome} className="relative z-0 bg-black/40 border border-white/5 rounded pl-3 pr-2 py-1.5 flex items-center justify-between overflow-hidden group/row hover:bg-white/[0.04] transition-colors">
+                                                {/* Progress Bar Background */}
+                                                <div
+                                                    className={`absolute left-0 top-0 bottom-0 ${stat.bgBarColor} transition-all duration-700 -z-10`}
+                                                    style={{ width: `${stat.pct}%` }}
+                                                />
+
+                                                <div className="flex items-center gap-2 max-w-[65%]">
+                                                    <span className="text-gray-500 text-[10px] font-bold w-3 text-right">{idx + 1}</span>
+                                                    <span className="text-sm font-bold text-gray-200 truncate" title={stat.outcome}>{stat.outcome}</span>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <span className={`text-sm font-black ${stat.textColors}`}>{stat.odds}x</span>
+                                                    <span className="text-[9px] text-gray-500 font-bold -mt-1">{stat.pct}%</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {remainingCount > 0 && (
+                                            <div className="text-center pt-1.5 text-[10px] uppercase font-bold text-gray-500">
+                                                + {remainingCount} outras opções
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        })()}
                     </div>
                 </div>
 
