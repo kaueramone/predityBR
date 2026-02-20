@@ -164,7 +164,7 @@ export default function ProfilePage() {
 
     const confirmDepositAmount = async () => {
         const val = parseFloat(depositAmount);
-        if (!val || val < 1) { alert('Valor mínimo de R$ 1,00'); return; }
+        if (!val || val < 10) { alert('Valor mínimo de depósito: R$ 10,00'); return; }
         setDepositLoading(true);
         try {
             const res = await fetch('/api/deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: val, userId: authUser.id }) });

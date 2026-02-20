@@ -161,8 +161,8 @@ export default function WalletPage() {
 
     const confirmDepositAmount = async () => {
         const val = parseFloat(depositAmount);
-        if (!val || val < 1) {
-            alert("Valor mínimo de R$ 1,00");
+        if (!val || val < 10) {
+            alert('Valor mínimo de depósito: R$ 10,00');
             return;
         }
 
@@ -214,8 +214,8 @@ export default function WalletPage() {
         const val = parseFloat(withdrawAmount);
 
         // Min Withdraw Check
-        if (!val || val < 10) {
-            alert("Valor mínimo de saque: R$ 10,00");
+        if (!val || val < 20) {
+            alert('Valor mínimo de saque: R$ 20,00');
             return;
         }
         // Max Withdraw Check

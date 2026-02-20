@@ -58,8 +58,8 @@ export default function HeroCardStack({ cards }: HeroCardStackProps) {
                 let newNo = card.no - fluctuation; // Inverse correlation (approx)
 
                 // Clamp values
-                if (newYes < 1.01) newYes = 1.01;
-                if (newNo < 1.01) newNo = 1.01;
+                if (newYes < 1.0) newYes = 1.0;
+                if (newNo < 1.0) newNo = 1.0;
 
                 return {
                     ...card,

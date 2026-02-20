@@ -60,7 +60,8 @@ export default function MarketDetailClient({ initialMarket, currentUser }: Marke
             let prob = totalPool === 0 ? (100 / market.outcomes.length) : ((outcomePool / totalPool) * 100);
             // Odd = payablePool / outcomePool (never pay more than 65% of total)
             let odds = (totalPool === 0 || outcomePool === 0) ? (market.outcomes.length * 0.65) : (payablePool / outcomePool);
-            if (odds < 1.01) odds = 1.01;
+            // Odd floor = 1.0x (100% certainty = money back only, no profit)
+            if (odds < 1.0) odds = 1.0;
             return {
                 name: outcome,
                 prob: prob.toFixed(1),
@@ -102,7 +103,10 @@ export default function MarketDetailClient({ initialMarket, currentUser }: Marke
         if (!user) { router.push('/login'); return; }
         if (!selectedOutcome) { alert("Selecione uma opção para apostar."); return; }
         const val = parseFloat(amount);
-        if (isNaN(val) || val <= 0) return;
+        if (isNaN(val) || val < 2) {
+            alert('Aposta mínima de R$ 2,00');
+            return;
+        }
 
         setPlacingBet(true);
         try {
