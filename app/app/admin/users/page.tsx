@@ -202,8 +202,8 @@ export default function AdminUsersPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                                    <div className="text-xs text-gray-500 mb-1">CPF</div>
-                                    <div className="font-mono text-sm text-gray-200">{selectedUser.cpf || 'Não informado'}</div>
+                                    <div className="text-xs text-gray-500 mb-1">CPF / Documento</div>
+                                    <div className="font-mono text-sm text-gray-200">{selectedUser.document || selectedUser.cpf || 'Não informado'}</div>
                                 </div>
                                 <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                                     <div className="text-xs text-gray-500 mb-1">Nascimento</div>
