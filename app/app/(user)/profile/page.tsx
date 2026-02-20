@@ -33,6 +33,15 @@ export default function ProfilePage() {
 
     const router = useRouter();
 
+    // CPF auto-mask helper
+    const formatCpf = (value: string) => {
+        const digits = value.replace(/\D/g, '').slice(0, 11);
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+        if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+        return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    };
+
     useEffect(() => {
         const getUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
@@ -82,8 +91,8 @@ export default function ProfilePage() {
         if (field === 'full_name') updates.full_name = value;
         else updates.full_name = nameValue || profile?.full_name || user.user_metadata?.full_name || "Usuario";
 
-        if (field === 'document') updates.document = value;
-        else updates.document = documentValue || profile?.document;
+        if (field === 'document') updates.document = value ? value.replace(/\D/g, '') : undefined;
+        else updates.document = documentValue ? documentValue.replace(/\D/g, '') : profile?.document;
 
         if (field === 'phone') updates.phone = value;
         else updates.phone = phoneValue || profile?.phone;
@@ -190,8 +199,9 @@ export default function ProfilePage() {
                             <input
                                 type="text"
                                 value={documentValue}
-                                onChange={(e) => setDocumentValue(e.target.value)}
+                                onChange={(e) => setDocumentValue(formatCpf(e.target.value))}
                                 placeholder="000.000.000-00"
+                                maxLength={14}
                                 className="bg-transparent w-full outline-none text-white"
                             />
                             <button

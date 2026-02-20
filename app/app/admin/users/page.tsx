@@ -10,6 +10,14 @@ export default function AdminUsersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUser, setSelectedUser] = useState<any | null>(null);
 
+    // Format CPF for display: 01234567890 -> 012.345.678-90
+    const formatCpfDisplay = (value?: string | null) => {
+        if (!value) return null;
+        const d = value.replace(/\D/g, '');
+        if (d.length !== 11) return value; // Return as-is if not exactly 11 digits
+        return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+    };
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -203,7 +211,9 @@ export default function AdminUsersPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                                     <div className="text-xs text-gray-500 mb-1">CPF / Documento</div>
-                                    <div className="font-mono text-sm text-gray-200">{selectedUser.document || selectedUser.cpf || 'Não informado'}</div>
+                                    <div className="font-mono text-sm text-gray-200">
+                                        {formatCpfDisplay(selectedUser.document || selectedUser.cpf) || 'Não informado'}
+                                    </div>
                                 </div>
                                 <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                                     <div className="text-xs text-gray-500 mb-1">Nascimento</div>

@@ -19,6 +19,15 @@ export default function RegisterForm() {
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
+    // CPF auto-mask: formats as 000.000.000-00
+    const formatCpf = (value: string) => {
+        const digits = value.replace(/\D/g, '').slice(0, 11);
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+        if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+        return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    };
+
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -113,9 +122,10 @@ export default function RegisterForm() {
                         <input
                             type="text"
                             value={cpf}
-                            onChange={(e) => setCpf(e.target.value)}
+                            onChange={(e) => setCpf(formatCpf(e.target.value))}
                             className="w-full bg-black/40 border border-surface rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary transition-all"
-                            placeholder="Apenas números"
+                            placeholder="000.000.000-00"
+                            maxLength={14}
                             required
                         />
                     </div>
