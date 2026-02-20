@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Search } from 'lucide-react';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function StatusBadge({ ok }: { ok: boolean | undefined }) {
@@ -35,6 +35,12 @@ export default function XGateDebugPage() {
     const [loading, setLoading] = useState(false);
     const [txs, setTxs] = useState<any[]>([]);
     const [txLoading, setTxLoading] = useState(true);
+    const [users, setUsers] = useState<any[]>([]);
+    const [usersLoading, setUsersLoading] = useState(true);
+    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [userDetail, setUserDetail] = useState<any>(null);
+    const [userDetailLoading, setUserDetailLoading] = useState(false);
+    const [userSearch, setUserSearch] = useState('');
 
     const runDiagnostic = async () => {
         setLoading(true);
@@ -62,12 +68,38 @@ export default function XGateDebugPage() {
         setTxLoading(false);
     };
 
+    const fetchUsers = async () => {
+        setUsersLoading(true);
+        try {
+            const res = await fetch('/api/deposit-debug');
+            const data = await res.json();
+            setUsers(data.users || []);
+        } catch { }
+        setUsersLoading(false);
+    };
+
+    const inspectUser = async (userId: string) => {
+        setUserDetailLoading(true);
+        setUserDetail(null);
+        try {
+            const res = await fetch(`/api/deposit-debug?userId=${userId}`);
+            setUserDetail(await res.json());
+        } catch { }
+        setUserDetailLoading(false);
+    };
+
     useEffect(() => {
         fetchTransactions();
         runDiagnostic();
+        fetchUsers();
     }, []);
 
     const s = report?.steps || {};
+    const filteredUsers = users.filter(u =>
+        !userSearch ||
+        u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+        u.full_name?.toLowerCase().includes(userSearch.toLowerCase())
+    );
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 p-4 pt-8 pb-32">
@@ -225,6 +257,126 @@ export default function XGateDebugPage() {
                     </div>
                 </div>
             )}
+
+            {/* ── USERS CPF PANEL ── */}
+            <div className="bg-surface border border-white/5 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="font-bold text-white">👤 Usuários — CPF & Status PIX</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Mostra exatamente o que seria enviado à XGate para cada usuário</p>
+                    </div>
+                    <button onClick={fetchUsers} className="text-xs text-gray-400 hover:text-white flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" /> Atualizar
+                    </button>
+                </div>
+
+                {/* search */}
+                <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                    <input
+                        value={userSearch}
+                        onChange={e => setUserSearch(e.target.value)}
+                        placeholder="Buscar por e-mail ou nome..."
+                        className="w-full bg-black/40 border border-white/5 rounded-lg pl-9 pr-4 py-2 text-sm text-white outline-none focus:border-primary/40"
+                    />
+                </div>
+
+                {usersLoading ? (
+                    <div className="text-center py-6 text-gray-500 text-sm">Carregando usuários...</div>
+                ) : (
+                    <div className="space-y-2">
+                        {filteredUsers.map(u => (
+                            <div key={u.id}
+                                className={`rounded-lg border p-3 text-xs cursor-pointer transition-all ${u.is_test_cpf ? 'bg-red-500/10 border-red-500/30' : u.ready_to_deposit ? 'bg-black/30 border-white/5 hover:border-primary/30' : 'bg-yellow-500/5 border-yellow-500/20'}`}
+                                onClick={() => { setSelectedUser(u); inspectUser(u.id); }}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="font-bold text-white">{u.full_name || '(sem nome)'}</span>
+                                        <span className="text-gray-500 ml-2">{u.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {u.is_test_cpf && <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold">🚨 CPF TESTE</span>}
+                                        {!u.is_test_cpf && !u.cpf_valid && u.cpf_raw_length > 0 && <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold">CPF INVÁLIDO</span>}
+                                        {u.ready_to_deposit && <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-bold">✅ PRONTO</span>}
+                                        {!u.ready_to_deposit && !u.is_test_cpf && <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-[10px] font-bold">⚠️ BLOQUEADO</span>}
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 mt-1.5 text-gray-500">
+                                    <span>CPF: <code className="text-gray-300">{u.cpf_masked}</code></span>
+                                    <span>Saldo: <code className="text-gray-300">R$ {Number(u.balance || 0).toFixed(2)}</code></span>
+                                    {u.cpf_error && <span className="text-red-400">{u.cpf_error}</span>}
+                                    {u.name_error && <span className="text-yellow-400">{u.name_error}</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* User detail drill-down */}
+                {selectedUser && (
+                    <div className="mt-4 bg-black/40 border border-primary/20 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-white text-sm">Detalhes: {selectedUser.email}</h3>
+                            <button onClick={() => { setSelectedUser(null); setUserDetail(null); }} className="text-gray-500 hover:text-white text-xs">✕ Fechar</button>
+                        </div>
+
+                        {userDetailLoading && <div className="text-gray-500 text-xs text-center py-4">Carregando...</div>}
+
+                        {userDetail && !userDetailLoading && (
+                            <div className="space-y-3">
+                                {/* CPF Analysis */}
+                                <div className="space-y-1.5">
+                                    <p className="text-xs font-bold text-gray-400 uppercase">Análise CPF</p>
+                                    {userDetail.cpf_analysis?.is_test_cpf && (
+                                        <div className="bg-red-500/15 border border-red-500/30 rounded-lg p-3 text-red-300 text-xs font-bold">
+                                            🚨 CPF DE TESTE DETECTADO — XGate irá rejeitar toda tentativa de cobrança com este CPF.
+                                            O usuário precisa atualizar o CPF no Perfil.
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="bg-black/30 rounded-lg p-2">
+                                            <span className="text-gray-500">CPF armazenado:</span>
+                                            <code className="block text-white mt-0.5">{userDetail.cpf_analysis?.masked}</code>
+                                        </div>
+                                        <div className="bg-black/30 rounded-lg p-2">
+                                            <span className="text-gray-500">Checksum válido:</span>
+                                            <span className={`block font-bold mt-0.5 ${userDetail.cpf_analysis?.checksum_valid ? 'text-primary' : 'text-red-400'}`}>
+                                                {userDetail.cpf_analysis?.checksum_valid ? '✅ Sim' : `❌ Não — ${userDetail.cpf_analysis?.checksum_error}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* XGate payload preview */}
+                                <div>
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-1.5">Payload exato que seria enviado à XGate</p>
+                                    <pre className="bg-black/60 border border-white/5 rounded-lg p-3 text-xs text-gray-300 overflow-x-auto">
+                                        {JSON.stringify(userDetail.xgate_payload_preview, null, 2)}
+                                    </pre>
+                                </div>
+
+                                {/* Recent deposits for this user */}
+                                {userDetail.recent_deposits?.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-400 uppercase mb-1.5">Últimos depósitos deste usuário</p>
+                                        <div className="space-y-1.5">
+                                            {userDetail.recent_deposits.map((tx: any) => (
+                                                <div key={tx.id} className="flex items-center justify-between bg-black/30 rounded-lg p-2 text-xs">
+                                                    <span className="text-gray-400">{new Date(tx.created_at).toLocaleString('pt-BR')}</span>
+                                                    <span className="text-white font-bold">R$ {Number(tx.amount).toFixed(2)}</span>
+                                                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${tx.status === 'COMPLETED' ? 'bg-primary/20 text-primary' : tx.status === 'FAILED' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{tx.status}</span>
+                                                    {tx.metadata?.xgate_id && <code className="text-gray-600">{tx.metadata.xgate_id.slice(0, 12)}...</code>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Recent Deposit Transactions */}
             <div className="bg-surface border border-white/5 rounded-xl p-5 space-y-4">
