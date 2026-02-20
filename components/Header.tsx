@@ -121,11 +121,18 @@ export default function Header({ user: initialUser }: { user: User | null }) {
                 <div className="flex items-center gap-3">
                     {user ? (
                         <>
-                            {/* Balance Badge (Visible Mobile & Desktop) */}
-                            {/* Using <a> tag instead of Link to force full reload if crossing domains */}
+                            {/* Balance Badge */}
                             <a href={getAppUrl("/app/wallet")} className="flex items-center gap-2 bg-surface/50 hover:bg-surface border border-primary/20 hover:border-primary/50 px-3 py-1.5 rounded-full transition-all group">
                                 <span className="text-primary font-bold text-xs group-hover:text-primary/80">R$ {balance.toFixed(2)}</span>
-                                <div className="bg-primary text-white text-[10px] font-bold px-1.5 rounded">+</div>
+                            </a>
+
+                            {/* Deposit Button — glowing green CTA */}
+                            <a
+                                href={getAppUrl("/app/wallet")}
+                                className="hidden sm:flex items-center gap-1.5 bg-primary hover:bg-primary/85 active:bg-primary/70 text-white font-black text-xs px-4 py-2 rounded-full transition-all shadow-[0_0_14px_rgba(4,179,5,0.5)] hover:shadow-[0_0_22px_rgba(4,179,5,0.7)] whitespace-nowrap"
+                                style={{ letterSpacing: '0.04em' }}
+                            >
+                                <span>DEPOSITAR</span>
                             </a>
 
                             {isAdmin && (

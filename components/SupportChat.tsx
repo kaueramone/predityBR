@@ -256,13 +256,7 @@ export default function SupportChat({ user: initialUser }: { user: User | null }
 
     return (
         <>
-            {/* Floating Button — desktop only, mobile uses BottomNav icon */}
-            <button
-                onClick={toggleChat}
-                className="hidden md:flex fixed bottom-8 right-4 z-[90] bg-[#25D366] hover:bg-[#128C7E] text-white p-4 rounded-full shadow-lg transition-all transform hover:scale-110 items-center justify-center"
-            >
-                <MessageCircle className="w-6 h-6" />
-            </button>
+            {/* Chat panel is opened via BottomNav support icon (all screens) */}
 
             {/* Chat Sidebar/Overlay */}
             {isOpen && (

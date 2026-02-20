@@ -15,12 +15,12 @@ const config: Config = {
       colors: {
         background: "#0f1115", // Almost black
         surface: "#233357", // Console dark blue/gray
-        primary: "#2F7C46", // Green
+        primary: "#04B305", // Brand green
         secondary: "#1a1d24", // Darker surface
         text: "#e2e8f0", // Light gray text
         accent: "#38bdf8", // Sky blue for highlights (optional)
         danger: "#ef4444", // Red for errors
-        success: "#22c55e", // Green for success
+        success: "#04B305", // Green for success
       },
     },
   },
