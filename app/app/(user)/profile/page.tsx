@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { validateCpf, validateFullName } from '@/lib/cpf';
 import {
     LogOut, Mail, CheckCircle, AlertCircle, Clock,
     Copy, ArrowDownLeft, ArrowUpRight, Target, TrendingUp,
@@ -45,8 +46,10 @@ export default function ProfilePage() {
 
     // Edit states
     const [nameValue, setNameValue] = useState('');
+    const [nameError, setNameError] = useState('');
     const [editingName, setEditingName] = useState(false);
     const [documentValue, setDocumentValue] = useState('');
+    const [documentError, setDocumentError] = useState('');
 
     // Password states
     const [currentPass, setCurrentPass] = useState('');
@@ -102,16 +105,22 @@ export default function ProfilePage() {
     };
 
     const handleSaveName = async () => {
-        if (!authUser || !nameValue.trim()) return;
+        if (!authUser) return;
+        const check = validateFullName(nameValue);
+        if (!check.valid) { setNameError(check.error || 'Nome inválido.'); return; }
+        setNameError('');
         setSaving(true);
-        await supabase.from('users').upsert({ id: authUser.id, email: authUser.email, full_name: nameValue });
-        setProfile((p: any) => ({ ...p, full_name: nameValue }));
+        await supabase.from('users').upsert({ id: authUser.id, email: authUser.email, full_name: nameValue.trim() });
+        setProfile((p: any) => ({ ...p, full_name: nameValue.trim() }));
         setEditingName(false);
         setSaving(false);
     };
 
     const handleSaveDocument = async () => {
         if (!authUser) return;
+        const check = validateCpf(documentValue);
+        if (!check.valid) { setDocumentError(check.error || 'CPF inválido.'); return; }
+        setDocumentError('');
         setSaving(true);
         const digits = documentValue.replace(/\D/g, '');
         await supabase.from('users').upsert({ id: authUser.id, email: authUser.email, document: digits });
@@ -396,14 +405,24 @@ export default function ProfilePage() {
                                 <div className="px-5 py-4">
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Nome</label>
                                     {editingName ? (
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text" value={nameValue} onChange={e => setNameValue(e.target.value)}
-                                                autoFocus
-                                                className="flex-1 bg-black/40 border border-primary/40 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-primary"
-                                            />
-                                            <button onClick={handleSaveName} disabled={saving} className="px-3 py-2 bg-primary text-white text-xs font-bold rounded-lg">{saving ? '...' : 'Salvar'}</button>
-                                            <button onClick={() => setEditingName(false)} className="px-3 py-2 bg-white/5 text-gray-400 text-xs font-bold rounded-lg">Cancelar</button>
+                                        <div className="space-y-1.5">
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text" value={nameValue}
+                                                    onChange={e => { setNameValue(e.target.value); setNameError(''); }}
+                                                    autoFocus
+                                                    placeholder="Nome Completo"
+                                                    className={`flex-1 bg-black/40 border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-primary ${nameError ? 'border-red-500/60' : 'border-primary/40'}`}
+                                                />
+                                                <button onClick={handleSaveName} disabled={saving} className="px-3 py-2 bg-primary text-white text-xs font-bold rounded-lg">{saving ? '...' : 'Salvar'}</button>
+                                                <button onClick={() => { setEditingName(false); setNameError(''); }} className="px-3 py-2 bg-white/5 text-gray-400 text-xs font-bold rounded-lg">Cancelar</button>
+                                            </div>
+                                            {nameError && (
+                                                <p className="text-xs text-red-400 flex items-center gap-1">
+                                                    <AlertCircle className="w-3 h-3" /> {nameError}
+                                                </p>
+                                            )}
+                                            <p className="text-[10px] text-gray-600">Informe nome e sobrenome exatamente como no seu CPF.</p>
                                         </div>
                                     ) : (
                                         <div className="flex items-center justify-between">
@@ -427,15 +446,21 @@ export default function ProfilePage() {
                                     <div className="flex gap-2">
                                         <input
                                             value={documentValue}
-                                            onChange={e => setDocumentValue(formatCpf(e.target.value))}
+                                            onChange={e => { setDocumentValue(formatCpf(e.target.value)); setDocumentError(''); }}
                                             placeholder="000.000.000-00"
                                             maxLength={14}
-                                            className="flex-1 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-primary/50 transition-colors"
+                                            className={`flex-1 bg-black/40 border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-primary/50 transition-colors ${documentError ? 'border-red-500/60' : 'border-white/5'}`}
                                         />
                                         <button onClick={handleSaveDocument} disabled={saving} className="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary/80 transition-colors">
                                             {saving ? '...' : 'Salvar'}
                                         </button>
                                     </div>
+                                    {documentError && (
+                                        <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" /> {documentError}
+                                        </p>
+                                    )}
+                                    <p className="text-[10px] text-gray-600 mt-1">Deve ser o mesmo CPF vinculado à sua conta PIX.</p>
                                 </div>
 
                                 {/* Email */}

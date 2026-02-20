@@ -53,6 +53,15 @@ export async function POST(req: Request) {
             }, { status: 400 });
         }
 
+        // Validate CPF checksum (rejects fake CPFs like 000.000.000-00)
+        const { validateCpf } = await import('@/lib/cpf');
+        const cpfCheck = validateCpf(userData.document);
+        if (!cpfCheck.valid) {
+            return NextResponse.json({
+                error: `CPF inválido no seu perfil: ${cpfCheck.error} Por favor, corrija o CPF nas configurações do seu Perfil.`
+            }, { status: 400 });
+        }
+
         // 1. Create Charge in XGate
         const xgateRes = await XGateService.createPixCharge({
             amount,

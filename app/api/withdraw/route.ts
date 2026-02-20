@@ -65,6 +65,15 @@ export async function POST(req: Request) {
             }, { status: 400 });
         }
 
+        // Validate CPF checksum
+        const { validateCpf } = await import('@/lib/cpf');
+        const cpfCheck = validateCpf(userData.document);
+        if (!cpfCheck.valid) {
+            return NextResponse.json({
+                error: `CPF inválido no seu perfil: ${cpfCheck.error} Por favor, corrija o CPF nas configurações do seu Perfil.`
+            }, { status: 400 });
+        }
+
         const FEE = 2.90;
         const totalDeduction = amount + FEE;
 
