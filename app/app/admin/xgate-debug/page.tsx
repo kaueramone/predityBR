@@ -280,39 +280,54 @@ export default function XGateDebugPage() {
                         <p className="text-red-400 text-sm">{discoverResult.error}</p>
                     ) : (
                         <div className="space-y-3">
-                            {/* Per-deposit lookup results */}
-                            {discoverResult.report?.per_deposit_lookup?.length > 0 && (
+                            {/* Summary */}
+                            {discoverResult.summary && (
+                                <div className={`rounded-lg p-3 text-sm font-bold border ${discoverResult.summary.startsWith('✅')
+                                        ? 'bg-primary/10 border-primary/20 text-primary'
+                                        : 'bg-red-500/10 border-red-500/20 text-red-300'
+                                    }`}>{discoverResult.summary}</div>
+                            )}
+
+                            {/* Customer lookup per transaction ID */}
+                            {discoverResult.report?.customer_lookup_by_transaction_id?.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Customer IDs encontrados por depósito:</p>
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">GET /customer/{'{' + 'transaction_id}'}:</p>
                                     <div className="space-y-2">
-                                        {discoverResult.report.per_deposit_lookup.map((r: any, i: number) => (
-                                            <div key={i} className="bg-black/30 rounded-lg p-3 text-xs space-y-1">
+                                        {discoverResult.report.customer_lookup_by_transaction_id.map((r: any, i: number) => (
+                                            <div key={i} className={`rounded-lg p-3 text-xs space-y-1 border ${r.try_as_customer_id?.['GET /customer/{id}']?.ok
+                                                    ? 'bg-primary/10 border-primary/20'
+                                                    : 'bg-black/30 border-white/5'
+                                                }`}>
                                                 <div className="flex items-center justify-between">
-                                                    <code className="text-gray-400">charge: {r.xgate_charge_id?.slice(0, 16)}...</code>
-                                                    {r.customer_id_found
-                                                        ? <span className="text-primary font-bold">✅ Customer ID: {r.customer_id_found}</span>
-                                                        : <span className="text-red-400">❌ Customer ID não encontrado</span>}
+                                                    <code className="text-gray-400">{r.xgate_transaction_id?.slice(0, 20)}...</code>
+                                                    <span className={`font-bold ${r.try_as_customer_id?.['GET /customer/{id}']?.ok ? 'text-primary' : 'text-red-400'
+                                                        }`}>
+                                                        HTTP {r.try_as_customer_id?.['GET /customer/{id}']?.status} — {r.note}
+                                                    </span>
                                                 </div>
-                                                <div className="grid grid-cols-3 gap-1 text-gray-600">
-                                                    <span>GET /deposit/<span>{'{' + 'id}'}</span>: <b className="text-gray-400">{r['GET /deposit/{id}']?.status}</b></span>
-                                                    <span>GET /deposits/<span>{'{' + 'id}'}</span>: <b className="text-gray-400">{r['GET /deposits/{id}']?.status}</b></span>
-                                                    <span>GET /transaction/<span>{'{' + 'id}'}</span>: <b className="text-gray-400">{r['GET /transaction/{id}']?.status}</b></span>
-                                                </div>
+                                                {r.try_as_customer_id?.customer_data && (
+                                                    <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto">
+                                                        {JSON.stringify(r.try_as_customer_id.customer_data, null, 2)}
+                                                    </pre>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
-                            {/* Endpoint scan */}
+
+                            {/* Endpoint scan — only simple objects */}
                             <div>
                                 <p className="text-xs font-bold text-gray-400 uppercase mb-2">Endpoints testados:</p>
                                 <div className="space-y-1">
-                                    {Object.entries(discoverResult.report || {}).filter(([k]) => k !== 'per_deposit_lookup').map(([endpoint, result]: any) => (
-                                        <div key={endpoint} className="flex items-center justify-between text-xs bg-black/20 rounded p-2">
-                                            <code className="text-gray-400">{endpoint}</code>
-                                            <span className={`font-bold ${result.ok ? 'text-primary' : 'text-red-400'}`}>HTTP {result.status}</span>
-                                        </div>
-                                    ))}
+                                    {Object.entries(discoverResult.report || {})
+                                        .filter(([k, v]) => k !== 'customer_lookup_by_transaction_id' && !Array.isArray(v))
+                                        .map(([endpoint, result]: any) => (
+                                            <div key={endpoint} className="flex items-center justify-between text-xs bg-black/20 rounded p-2">
+                                                <code className="text-gray-400">{endpoint}</code>
+                                                <span className={`font-bold ${result.ok ? 'text-primary' : 'text-red-400'}`}>HTTP {result.status}</span>
+                                            </div>
+                                        ))}
                                 </div>
                             </div>
                             <JsonBlock data={discoverResult.report} />
