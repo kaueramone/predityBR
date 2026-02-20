@@ -97,13 +97,13 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
     const probYes = currentPool === 0 ? 0.5 : ((currentYes || 1) / currentPool);
     const probNo = currentPool === 0 ? 0.5 : ((currentNo || 1) / currentPool);
 
-    // Odds (Payout Multiplier) with 35% house commission: payouts = 65% of pool
-    const payableYes = currentPool * 0.65;
-    const payableNo = currentPool * 0.65;
-    const oddsYes = (currentPool === 0 || currentYes === 0) ? (2 * 0.65) : (payableYes / currentYes);
-    const oddsNo = (currentPool === 0 || currentNo === 0) ? (2 * 0.65) : (payableNo / currentNo);
+    // Profit-based commission: finalOdds = 1 + (rawOdds - 1) * 0.65  → always ≥ 1.0x
+    const rawOddsYes = (currentPool === 0 || currentYes === 0) ? 2 : (currentPool / currentYes);
+    const rawOddsNo = (currentPool === 0 || currentNo === 0) ? 2 : (currentPool / currentNo);
+    const oddsYes = Math.max(1.0, 1 + (rawOddsYes - 1) * 0.65);
+    const oddsNo = Math.max(1.0, 1 + (rawOddsNo - 1) * 0.65);
 
-    const formatOdds = (val: number) => (val < 1.0 ? 1.0 : val).toFixed(2);
+    const formatOdds = (val: number) => val.toFixed(2);
 
     // Fallback percentages for binary display
     const yesPct = Math.round(probYes * 100);
@@ -209,8 +209,9 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                                 const pctRaw = currentPool === 0 ? (100 / availableOutcomes.length) : ((amount / currentPool) * 100);
                                 const pct = Math.round(pctRaw) || 0;
 
-                                let oddsRaw = (currentPool === 0 || amount === 0) ? (availableOutcomes.length * 0.65) : ((currentPool * 0.65) / amount);
-                                const odds = (oddsRaw < 1.0 ? 1.0 : oddsRaw).toFixed(2);
+                                let rawOdds = (currentPool === 0 || amount === 0) ? availableOutcomes.length : (currentPool / amount);
+                                let oddsRaw = Math.max(1.0, 1 + (rawOdds - 1) * 0.65);
+                                const odds = oddsRaw.toFixed(2);
 
                                 const norm = outcome.toUpperCase();
                                 const isSim = norm === 'SIM' || norm === 'YES';
