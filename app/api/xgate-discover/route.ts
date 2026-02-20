@@ -22,10 +22,7 @@ async function xgateLogin(): Promise<string> {
 async function probe(token: string, path: string, method = 'GET', body?: any) {
     const res = await fetch(`${BASE_URL}${path}`, {
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const json = await res.json().catch(() => null);
@@ -34,70 +31,80 @@ async function probe(token: string, path: string, method = 'GET', body?: any) {
 
 export async function POST(req: Request) {
     try {
-        const { email } = await req.json().catch(() => ({}));
-
         const token = await xgateLogin();
         const report: Record<string, any> = {};
 
-        // ── 1. Try GET /customers ────────────────────────────────────────────
-        report['GET /customers'] = await probe(token, '/customers');
-
-        // ── 2. Try GET /customer ─────────────────────────────────────────────
-        report['GET /customer'] = await probe(token, '/customer');
-
-        // ── 3. Try GET /customers?email= ────────────────────────────────────
-        if (email) {
-            report[`GET /customers?email=${email}`] = await probe(token, `/customers?email=${encodeURIComponent(email)}`);
-            report[`GET /customer?email=${email}`] = await probe(token, `/customer?email=${encodeURIComponent(email)}`);
+        // ── 1. Endpoint scan ────────────────────────────────────────────────
+        for (const path of ['/customers', '/customer', '/deposit', '/deposits']) {
+            report[`GET ${path}`] = await probe(token, path);
+            await new Promise(r => setTimeout(r, 150));
         }
 
-        // ── 4. Try GET /deposit (list of our deposits) ─────────────────────
-        report['GET /deposit'] = await probe(token, '/deposit');
-
-        // ── 5. Look up each user's latest xgate_id and try GET /deposit/{id}
+        // ── 2. For each stored transaction ID: try GET /customer/{id} ───────
+        // The theory: POST /deposit response body has the customer _id somewhere;
+        // we try each stored xgate_id as if it were a customer ID to see if any hit.
         const { data: txRows } = await supabaseAdmin
             .from('transactions')
-            .select('user_id, metadata')
+            .select('user_id, metadata, created_at')
             .eq('type', 'DEPOSIT')
             .not('metadata', 'is', null)
             .order('created_at', { ascending: false })
-            .limit(20);
+            .limit(15);
 
-        const perDepositResults: any[] = [];
-        const seen = new Set<string>();
+        const customerLookupResults: any[] = [];
+        const seenIds = new Set<string>();
 
         for (const tx of txRows || []) {
             const xgateId = tx.metadata?.xgate_id;
-            if (!xgateId || seen.has(xgateId)) continue;
-            seen.add(xgateId);
+            if (!xgateId || seenIds.has(xgateId) || xgateId === 'unknown_id') continue;
+            seenIds.add(xgateId);
 
-            const r1 = await probe(token, `/deposit/${xgateId}`);
-            const r2 = await probe(token, `/deposits/${xgateId}`);
-            const r3 = await probe(token, `/transaction/${xgateId}`);
+            // Try GET /customer/{transaction_id} — maybe the ID IS shared
+            const r = await probe(token, `/customer/${xgateId}`);
+            const customerData = r.body;
 
-            // Try to extract customerId from any of these responses
-            const anyBody = r1.ok ? r1.body : r2.ok ? r2.body : r3.body;
-            const d = anyBody?.data || anyBody;
-            const foundCustomerId =
-                d?.customer?._id || d?.customer?.id ||
-                d?.customerId || d?.clientId || null;
+            // Also extract any nested IDs from the stored metadata
+            const metaCustomerId =
+                tx.metadata?.xgate_customer_id ||
+                tx.metadata?.customer_id ||
+                tx.metadata?.customerId ||
+                null;
 
-            perDepositResults.push({
-                xgate_charge_id: xgateId,
-                user_id: tx.user_id,
-                customer_id_found: foundCustomerId,
-                'GET /deposit/{id}': r1,
-                'GET /deposits/{id}': r2,
-                'GET /transaction/{id}': r3,
+            customerLookupResults.push({
+                xgate_transaction_id: xgateId,
+                try_as_customer_id: {
+                    'GET /customer/{id}': { status: r.status, ok: r.ok },
+                    customer_data: r.ok ? customerData : null,
+                    customer_id_in_response: customerData?._id || null,
+                    document_in_response: customerData?.document || null,
+                    name_in_response: customerData?.name || null,
+                },
+                metadata_customer_id: metaCustomerId,
+                note: r.ok
+                    ? '✅ Funcionou! Este transaction ID é também o Customer ID'
+                    : r.status === 404
+                        ? '❌ 404 — IDs são diferentes (transaction ≠ customer)'
+                        : `⚠️ HTTP ${r.status}`,
             });
 
-            await new Promise(r => setTimeout(r, 200));
-            if (perDepositResults.length >= 5) break; // limit probing
+            await new Promise(r => setTimeout(r, 300));
+            if (customerLookupResults.length >= 6) break;
         }
 
-        report['per_deposit_lookup'] = perDepositResults;
+        report['customer_lookup_by_transaction_id'] = customerLookupResults;
 
-        return NextResponse.json({ token_ok: true, report });
+        // ── 3. Summary ──────────────────────────────────────────────────────
+        const anyFound = customerLookupResults.some(r =>
+            r.try_as_customer_id['GET /customer/{id}'].ok
+        );
+
+        return NextResponse.json({
+            token_ok: true,
+            summary: anyFound
+                ? '✅ transaction_id IS the customer_id — use xgate_id from metadata for PUT /customer/{id}'
+                : '❌ transaction_id is NOT the customer_id — need another way to find customer IDs',
+            report,
+        });
 
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
