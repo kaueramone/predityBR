@@ -192,8 +192,7 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                     </div>
 
                     {/* Odds & Buttons - Dynamic Outcomes */}
-                    <div className="relative z-10 mt-auto min-h-[80px]">
-                        {/* Calculate all outcomes first to sort them by probability/odds */}
+                    <div className="relative z-10 mt-auto" style={{ minHeight: 100 }}>
                         {(() => {
                             const availableOutcomes = (outcomes && outcomes.length > 0) ? outcomes : ['SIM', 'NÃO'];
 
@@ -204,70 +203,70 @@ export default function MarketCard({ id, title, category, imageUrl, endDate, poo
                                     if ((outcome === 'NÃO' || outcome === 'NO') && currentNo) amount = currentNo;
                                 }
 
-                                // Safe math matching MarketDetailClient EXACTLY
                                 const pctRaw = currentPool === 0 ? (100 / availableOutcomes.length) : ((amount / currentPool) * 100);
                                 const pct = Math.round(pctRaw) || 0;
 
                                 let oddsRaw = (currentPool === 0 || amount === 0) ? (availableOutcomes.length * 0.82) : ((currentPool * 0.82) / amount);
                                 const odds = (oddsRaw < 1.01 ? 1.01 : oddsRaw).toFixed(2);
 
-                                let textColors = 'text-gray-400';
-                                let bgBarColor = 'bg-gray-500/20';
                                 const norm = outcome.toUpperCase();
-                                if (norm === 'SIM' || norm === 'YES') {
-                                    textColors = 'text-green-500'; bgBarColor = 'bg-green-500/20 bg-opacity-30';
-                                } else if (norm === 'NÃO' || norm === 'NO') {
-                                    textColors = 'text-red-500'; bgBarColor = 'bg-red-500/20 bg-opacity-30';
-                                } else {
-                                    textColors = 'text-blue-500'; bgBarColor = 'bg-blue-500/20 bg-opacity-30';
-                                }
+                                const isSim = norm === 'SIM' || norm === 'YES';
+                                const isNao = norm === 'NÃO' || norm === 'NO';
+                                const color = isSim ? { text: 'text-emerald-400', border: 'border-emerald-500/30', glow: 'hover:shadow-[0_0_16px_rgba(52,211,153,0.25)]', bar: 'bg-emerald-500/15', pill: 'bg-emerald-500/10 text-emerald-400' }
+                                    : isNao ? { text: 'text-red-400', border: 'border-red-500/30', glow: 'hover:shadow-[0_0_16px_rgba(239,68,68,0.25)]', bar: 'bg-red-500/15', pill: 'bg-red-500/10 text-red-400' }
+                                        : { text: 'text-blue-400', border: 'border-blue-500/30', glow: 'hover:shadow-[0_0_16px_rgba(96,165,250,0.25)]', bar: 'bg-blue-500/15', pill: 'bg-blue-500/10 text-blue-400' };
 
-                                return { outcome, amount, odds, pct, textColors, bgBarColor };
-                            }).sort((a, b) => b.pct - a.pct); // Highest prob first
+                                return { outcome, amount, odds, pct, color };
+                            }).sort((a, b) => b.pct - a.pct);
 
                             if (availableOutcomes.length <= 2) {
-                                // DEFAULT GRID (Side-By-Side)
+                                // BINARY — tall buttons with glow effect
                                 return (
-                                    <div className="grid grid-cols-2 gap-3 mt-auto">
+                                    <div className="grid grid-cols-2 gap-2 mt-auto h-[100px]">
                                         {sortedStats.map((stat) => (
-                                            <div key={stat.outcome} className={`bg-surface hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-lg p-2 text-center transition-all group/btn`}>
-                                                <div className="text-[10px] text-gray-400 uppercase font-bold mb-1 truncate px-1" title={stat.outcome}>{stat.outcome}</div>
-                                                <div className={`text-2xl font-black ${stat.textColors} group-hover/btn:scale-110 transition-transform`}>
-                                                    {stat.odds}x
+                                            <div
+                                                key={stat.outcome}
+                                                className={`relative overflow-hidden flex flex-col items-center justify-center rounded-xl border ${stat.color.border} bg-black/30 ${stat.color.glow} transition-all duration-300 cursor-pointer group/btn hover:scale-[1.02] active:scale-[0.98] h-full`}
+                                            >
+                                                {/* Subtle background fill by probability */}
+                                                <div className={`absolute inset-0 ${stat.color.bar} opacity-60`} />
+                                                <div className="relative z-10 flex flex-col items-center gap-0.5">
+                                                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">{stat.outcome}</span>
+                                                    <span className={`text-2xl font-black ${stat.color.text} group-hover/btn:scale-105 transition-transform`}>
+                                                        {stat.odds}x
+                                                    </span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stat.color.pill}`}>
+                                                        {stat.pct}%
+                                                    </span>
                                                 </div>
-                                                <div className="text-[10px] text-gray-500">{stat.pct}%</div>
                                             </div>
                                         ))}
                                     </div>
                                 );
                             } else {
-                                // MULTI-OPTION LEADERBOARD
+                                // MULTI-OPTION LEADERBOARD — 3 rows, totals 100px like binary
                                 const top3 = sortedStats.slice(0, 3);
                                 const remainingCount = sortedStats.length - 3;
 
                                 return (
-                                    <div className="space-y-1.5 flex flex-col justify-end mt-auto">
+                                    <div className="flex flex-col gap-1 mt-auto" style={{ minHeight: 100 }}>
                                         {top3.map((stat, idx) => (
-                                            <div key={stat.outcome} className="relative z-0 bg-black/40 border border-white/5 rounded pl-3 pr-2 py-1.5 flex items-center justify-between overflow-hidden group/row hover:bg-white/[0.04] transition-colors">
-                                                {/* Progress Bar Background */}
-                                                <div
-                                                    className={`absolute left-0 top-0 bottom-0 ${stat.bgBarColor} transition-all duration-700 -z-10`}
-                                                    style={{ width: `${stat.pct}%` }}
-                                                />
-
-                                                <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
-                                                    <span className="text-gray-500 text-[10px] font-bold w-3 text-right flex-shrink-0">{idx + 1}</span>
-                                                    <span className="text-sm font-bold text-gray-200 truncate" title={stat.outcome}>{stat.outcome}</span>
+                                            <div key={stat.outcome} className="relative overflow-hidden bg-black/30 border border-white/5 rounded-lg px-3 py-2 flex items-center justify-between hover:bg-white/[0.04] transition-colors flex-1">
+                                                {/* Progress bar */}
+                                                <div className={`absolute left-0 top-0 bottom-0 ${stat.color.bar} transition-all duration-700`} style={{ width: `${stat.pct}%` }} />
+                                                <div className="relative flex items-center gap-2 flex-1 min-w-0 pr-2">
+                                                    <span className="text-gray-600 text-[10px] font-bold w-3 text-right flex-shrink-0">{idx + 1}</span>
+                                                    <span className="text-xs font-bold text-gray-200 truncate">{stat.outcome}</span>
                                                 </div>
-                                                <div className="flex flex-col items-end flex-shrink-0">
-                                                    <span className={`text-sm font-black ${stat.textColors}`}>{stat.odds}x</span>
-                                                    <span className="text-[9px] text-gray-500 font-bold -mt-1">{stat.pct}%</span>
+                                                <div className="relative flex items-center gap-2 flex-shrink-0">
+                                                    <span className={`text-sm font-black ${stat.color.text}`}>{stat.odds}x</span>
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${stat.color.pill}`}>{stat.pct}%</span>
                                                 </div>
                                             </div>
                                         ))}
                                         {remainingCount > 0 && (
-                                            <div className="text-center pt-1.5 text-[10px] uppercase font-bold text-gray-500">
-                                                + {remainingCount} outras opções
+                                            <div className="text-center pt-0.5 text-[10px] uppercase font-bold text-gray-600">
+                                                +{remainingCount} mais
                                             </div>
                                         )}
                                     </div>
