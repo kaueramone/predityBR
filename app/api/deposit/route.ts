@@ -86,6 +86,24 @@ export async function POST(req: Request) {
         const qrCode = d.code || d.qrCode || d.payload || d.pixKey || d.qrCodeText || d.paymentCode || d.pixCopiaECola || d.emv || d.codigoPix || "";
         const qrCodeImage = d.qrCodeImage || d.qrCodeBase64 || d.image || d.imagemPix || "";
 
+        // ── Capture XGate customerId and store in users table ────────────────
+        // XGate may return the customer ID in various paths depending on API version
+        const xgateCustomerId =
+            d.customer?._id ||
+            d.customer?.id ||
+            d.customerId ||
+            d.clientId ||
+            null;
+
+        if (xgateCustomerId && !userData.xgate_customer_id) {
+            // First deposit — save the customer ID for future syncs
+            await supabase
+                .from('users')
+                .update({ xgate_customer_id: xgateCustomerId })
+                .eq('id', userId);
+            console.log(`[deposit] Stored xgate_customer_id=${xgateCustomerId} for user ${userId}`);
+        }
+
         if (!qrCode) {
             return NextResponse.json({ error: `Estrutura da resposta XGate: ${JSON.stringify(xgateData)}` }, { status: 500 });
         }
@@ -99,7 +117,7 @@ export async function POST(req: Request) {
                 amount: amount,
                 status: 'PENDING',
                 description: `Depósito PIX (XGate)`,
-                metadata: { xgate_id: externalId }
+                metadata: { xgate_id: externalId, xgate_customer_id: xgateCustomerId }
             })
             .select()
             .single();

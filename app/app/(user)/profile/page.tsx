@@ -113,6 +113,15 @@ export default function ProfilePage() {
         await supabase.from('users').upsert({ id: authUser.id, email: authUser.email, full_name: nameValue.trim() });
         setProfile((p: any) => ({ ...p, full_name: nameValue.trim() }));
         setEditingName(false);
+        // Sync to XGate (best-effort — doesn't block UI)
+        fetch('/api/xgate-sync-customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: authUser.id }),
+        }).then(r => r.json()).then(d => {
+            if (!d.ok && !d.skipped) console.warn('[profile] XGate sync failed:', d);
+            else console.log('[profile] XGate sync:', d.message || d.reason);
+        }).catch(console.warn);
         setSaving(false);
     };
 
@@ -125,6 +134,19 @@ export default function ProfilePage() {
         const digits = documentValue.replace(/\D/g, '');
         await supabase.from('users').upsert({ id: authUser.id, email: authUser.email, document: digits });
         setProfile((p: any) => ({ ...p, document: digits }));
+        // Sync updated CPF to XGate — THIS is the key fix for the test CPF problem
+        const syncRes = await fetch('/api/xgate-sync-customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: authUser.id }),
+        }).then(r => r.json()).catch(() => ({ ok: false }));
+        if (!syncRes.ok && !syncRes.skipped) {
+            console.warn('[profile] XGate CPF sync failed:', syncRes);
+            // Show a subtle warning but don't block — user's local profile is saved
+            setDocumentError(`CPF salvo localmente. Sincronização XGate: ${syncRes.error || 'pendente'}`);
+        } else {
+            console.log('[profile] XGate CPF sync:', syncRes.message || syncRes.reason);
+        }
         setSaving(false);
     };
 
