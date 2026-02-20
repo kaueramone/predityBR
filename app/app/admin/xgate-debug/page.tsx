@@ -88,14 +88,24 @@ export default function XGateDebugPage() {
         setUserDetailLoading(false);
     };
 
-    useEffect(() => {
-        fetchTransactions();
-        runDiagnostic();
-        fetchUsers();
-    }, []);
+    const [syncing, setSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState<any>(null);
+
+    const runSyncAll = async () => {
+        if (!confirm('Sincronizar TODOS os usuários com xgate_customer_id na XGate?\nIsto vai chamar PUT /customer/{id} para cada um.')) return;
+        setSyncing(true);
+        setSyncResult(null);
+        try {
+            const res = await fetch('/api/xgate-sync-all', { method: 'POST' });
+            setSyncResult(await res.json());
+        } catch (e: any) {
+            setSyncResult({ error: e.message });
+        }
+        setSyncing(false);
+    };
 
     const s = report?.steps || {};
-    const filteredUsers = users.filter(u =>
+    const filteredUsers = users.filter((u: any) =>
         !userSearch ||
         u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
         u.full_name?.toLowerCase().includes(userSearch.toLowerCase())
@@ -110,15 +120,62 @@ export default function XGateDebugPage() {
                     <h1 className="text-2xl font-black text-white">🔍 PIX Debug — XGate</h1>
                     <p className="text-xs text-gray-500 mt-1">Página oculta de diagnóstico — não indexada</p>
                 </div>
-                <button
-                    onClick={() => { runDiagnostic(); fetchTransactions(); }}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/85 text-white text-sm font-bold rounded-lg disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    Re-rodar Diagnóstico
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={runSyncAll}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold rounded-lg disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                        {syncing ? 'Sincronizando...' : '🔄 Forçar Sync XGate (todos)'}
+                    </button>
+                    <button
+                        onClick={() => { runDiagnostic(); fetchTransactions(); fetchUsers(); }}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/85 text-white text-sm font-bold rounded-lg disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        Re-rodar Diagnóstico
+                    </button>
+                </div>
             </div>
+
+            {/* Sync All Result */}
+            {syncResult && (
+                <div className={`rounded-xl border p-5 space-y-3 text-sm ${syncResult.error ? 'bg-red-500/10 border-red-500/30' : 'bg-surface border-white/5'}`}>
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-bold text-white">Resultado do Sync em Lote</h2>
+                        <button onClick={() => setSyncResult(null)} className="text-gray-500 hover:text-white text-xs">✕</button>
+                    </div>
+                    {syncResult.error ? (
+                        <p className="text-red-400">{syncResult.error}</p>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                                {[['Total', syncResult.total, 'text-white'], ['Sincronizados', syncResult.synced, 'text-primary'], ['Bloqueados', syncResult.locked, 'text-yellow-400'], ['Erros', syncResult.errors, 'text-red-400']].map(([label, val, cls]: any) => (
+                                    <div key={label} className="bg-black/30 rounded-lg p-3">
+                                        <div className={`text-2xl font-black ${cls}`}>{val ?? 0}</div>
+                                        <div className="text-gray-500 mt-0.5">{label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                                {syncResult.results?.map((r: any, i: number) => (
+                                    <div key={i} className={`flex items-center justify-between text-xs rounded-lg p-2 ${r.status === 'synced' ? 'bg-primary/10' : r.status === 'error' ? 'bg-red-500/10' : 'bg-black/20'}`}>
+                                        <span className="text-gray-300">{r.email}</span>
+                                        <div className="flex items-center gap-2">
+                                            {r.customerId && <code className="text-gray-600">{r.customerId.slice(0, 10)}...</code>}
+                                            <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${r.status === 'synced' ? 'text-primary' : r.status === 'locked' ? 'text-yellow-400' : r.status === 'error' ? 'text-red-400' : 'text-gray-500'}`}>
+                                                {r.status === 'synced' ? '✅ sync' : r.status === 'locked' ? '🔒 bloqueado' : r.status === 'error' ? `❌ ${r.xgate || r.error}` : `⏭ ${r.reason}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* ENV Check */}
             {report?.env && (
