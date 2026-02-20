@@ -29,6 +29,109 @@ function JsonBlock({ data }: { data: any }) {
     );
 }
 
+// ── ManualSyncForm ────────────────────────────────────────────────────────────
+function ManualSyncForm({ users }: { users: any[] }) {
+    const [customerId, setCustomerId] = useState('');
+    const [selectedUserId, setSelectedUserId] = useState('');
+    const [manualCpf, setManualCpf] = useState('');
+    const [syncing, setSyncing] = useState(false);
+    const [result, setResult] = useState<any>(null);
+
+    const run = async () => {
+        if (!customerId.trim()) { alert('Cole o Customer ID da XGate'); return; }
+        setSyncing(true);
+        setResult(null);
+        try {
+            const res = await fetch('/api/xgate-sync-manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    xgateCustomerId: customerId.trim(),
+                    userId: selectedUserId || undefined,
+                    document: manualCpf || undefined,
+                }),
+            });
+            setResult(await res.json());
+        } catch (e: any) {
+            setResult({ ok: false, error: e.message });
+        }
+        setSyncing(false);
+    };
+
+    return (
+        <div className="space-y-3">
+            {/* Customer ID */}
+            <div>
+                <label className="text-xs text-gray-500 block mb-1">XGate Customer ID <span className="text-amber-400">(copie do painel XGate)</span></label>
+                <input
+                    value={customerId}
+                    onChange={e => setCustomerId(e.target.value)}
+                    placeholder="ex: 6998a9ac43ab146aeadcd00d"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-mono outline-none focus:border-amber-500/50"
+                />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* User dropdown */}
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">Usuário (puxa CPF/nome do perfil)</label>
+                    <select
+                        value={selectedUserId}
+                        onChange={e => setSelectedUserId(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+                    >
+                        <option value="">— selecione —</option>
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>
+                                {u.email} {u.cpf_masked ? `· ${u.cpf_masked}` : '· sem CPF'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Manual CPF override */}
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">Ou digite o CPF manualmente (override)</label>
+                    <input
+                        value={manualCpf}
+                        onChange={e => setManualCpf(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Somente números: 01234567890"
+                        maxLength={11}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-mono outline-none focus:border-amber-500/50"
+                    />
+                </div>
+            </div>
+
+            <button
+                onClick={run}
+                disabled={syncing || !customerId.trim()}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-lg disabled:opacity-50 flex items-center gap-2"
+            >
+                {syncing ? '🔄 Enviando...' : '⚡ Sincronizar este Customer'}
+            </button>
+
+            {result && (
+                <div className={`rounded-lg border p-4 text-xs space-y-2 ${result.ok ? 'bg-primary/10 border-primary/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                        {result.ok ? <span className="text-primary">✅ Sucesso</span> : <span className="text-red-400">❌ Erro</span>}
+                        <span className="text-gray-500 font-normal">HTTP {result.http_status}</span>
+                    </div>
+                    {result.payload_sent && (
+                        <div>
+                            <p className="text-gray-400 font-bold uppercase mb-1">Payload enviado:</p>
+                            <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto">{JSON.stringify(result.payload_sent, null, 2)}</pre>
+                        </div>
+                    )}
+                    <div>
+                        <p className="text-gray-400 font-bold uppercase mb-1">Resposta XGate:</p>
+                        <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto">{JSON.stringify(result.xgate_response || result.error, null, 2)}</pre>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function XGateDebugPage() {
     const [report, setReport] = useState<any>(null);
@@ -176,6 +279,18 @@ export default function XGateDebugPage() {
                     )}
                 </div>
             )}
+
+            {/* ── MANUAL SYNC PANEL ── */}
+            <div className="bg-surface border border-amber-500/20 rounded-xl p-5 space-y-4">
+                <div>
+                    <h2 className="font-bold text-white">🔧 Sync Manual por Customer ID</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                        Para usuários sem ID capturado: cole o Customer ID do painel XGate e selecione o usuário.
+                    </p>
+                </div>
+
+                <ManualSyncForm users={users} />
+            </div>
 
             {/* ENV Check */}
             {report?.env && (
