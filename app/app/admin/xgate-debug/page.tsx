@@ -294,21 +294,34 @@ export default function XGateDebugPage() {
                                     <p className="text-xs font-bold text-gray-400 uppercase mb-2">GET /customer/{'{' + 'transaction_id}'}:</p>
                                     <div className="space-y-2">
                                         {discoverResult.report.customer_lookup_by_transaction_id.map((r: any, i: number) => (
-                                            <div key={i} className={`rounded-lg p-3 text-xs space-y-1 border ${r.try_as_customer_id?.['GET /customer/{id}']?.ok
-                                                ? 'bg-primary/10 border-primary/20'
-                                                : 'bg-black/30 border-white/5'
+                                            <div key={i} className={`rounded-lg p-3 text-xs space-y-2 border ${r.try_as_customer_id?.['GET /customer/{id}']?.ok
+                                                    ? 'bg-primary/10 border-primary/20'
+                                                    : 'bg-black/30 border-white/5'
                                                 }`}>
-                                                <div className="flex items-center justify-between">
-                                                    <code className="text-gray-400">{r.xgate_transaction_id?.slice(0, 20)}...</code>
+                                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                                    <code className="text-gray-400">{r.xgate_transaction_id}</code>
                                                     <span className={`font-bold ${r.try_as_customer_id?.['GET /customer/{id}']?.ok ? 'text-primary' : 'text-red-400'
                                                         }`}>
-                                                        HTTP {r.try_as_customer_id?.['GET /customer/{id}']?.status} — {r.note}
+                                                        HTTP {r.try_as_customer_id?.['GET /customer/{id}']?.status}
                                                     </span>
                                                 </div>
                                                 {r.try_as_customer_id?.customer_data && (
-                                                    <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto">
-                                                        {JSON.stringify(r.try_as_customer_id.customer_data, null, 2)}
-                                                    </pre>
+                                                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                                        <div className="bg-black/30 rounded p-1.5">
+                                                            <span className="text-gray-500">Email:</span>
+                                                            <div className="text-white font-bold break-all">{r.try_as_customer_id.customer_data.email || '—'}</div>
+                                                        </div>
+                                                        <div className="bg-black/30 rounded p-1.5">
+                                                            <span className="text-gray-500">Nome:</span>
+                                                            <div className="text-white">{r.try_as_customer_id.customer_data.name || '—'}</div>
+                                                        </div>
+                                                        <div className="bg-black/30 rounded p-1.5">
+                                                            <span className="text-gray-500">CPF na XGate:</span>
+                                                            <div className={`font-bold ${r.try_as_customer_id.customer_data.document === '12345678909' || r.try_as_customer_id.customer_data.document === '00000000000'
+                                                                    ? 'text-red-400' : 'text-primary'
+                                                                }`}>{r.try_as_customer_id.customer_data.document || '—'}</div>
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
@@ -358,16 +371,16 @@ export default function XGateDebugPage() {
                             <div className="space-y-2 max-h-96 overflow-y-auto">
                                 {syncResult.results?.map((r: any, i: number) => (
                                     <div key={i} className={`text-xs rounded-lg p-3 space-y-1.5 border ${r.status === 'synced' ? 'bg-primary/10 border-primary/20'
-                                            : r.status === 'locked' ? 'bg-yellow-500/5 border-yellow-500/20'
-                                                : r.status === 'error' ? 'bg-red-500/10 border-red-500/20'
-                                                    : 'bg-black/20 border-white/5'
+                                        : r.status === 'locked' ? 'bg-yellow-500/5 border-yellow-500/20'
+                                            : r.status === 'error' ? 'bg-red-500/10 border-red-500/20'
+                                                : 'bg-black/20 border-white/5'
                                         }`}>
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-white">{r.email}</span>
                                             <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${r.status === 'synced' ? 'text-primary bg-primary/20'
-                                                    : r.status === 'locked' ? 'text-yellow-400 bg-yellow-500/10'
-                                                        : r.status === 'error' ? 'text-red-400 bg-red-500/10'
-                                                            : 'text-gray-500'
+                                                : r.status === 'locked' ? 'text-yellow-400 bg-yellow-500/10'
+                                                    : r.status === 'error' ? 'text-red-400 bg-red-500/10'
+                                                        : 'text-gray-500'
                                                 }`}>
                                                 {r.status === 'synced' ? '✅ sync'
                                                     : r.status === 'locked' ? '🔒 bloqueado'
