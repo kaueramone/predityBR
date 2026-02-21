@@ -132,6 +132,91 @@ function ManualSyncForm({ users }: { users: any[] }) {
     );
 }
 
+// ── CreateCustomerForm ─────────────────────────────────────────────────────────
+function CreateCustomerForm() {
+    const [name, setName] = useState('');
+    const [document, setDocument] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [notValidationDuplicated, setNotValidationDuplicated] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const [result, setResult] = useState<any>(null);
+
+    const run = async () => {
+        if (!name.trim() || !document.trim()) { alert('Nome e Documento são obrigatórios'); return; }
+        setSyncing(true);
+        setResult(null);
+        try {
+            const res = await fetch('/api/xgate-create-customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name.trim(),
+                    document: document.replace(/\D/g, ''),
+                    email: email.trim() || undefined,
+                    phone: phone.replace(/\D/g, '') || undefined,
+                    notValidationDuplicated
+                }),
+            });
+            setResult(await res.json());
+        } catch (e: any) {
+            setResult({ ok: false, error: e.message });
+        }
+        setSyncing(false);
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">Nome *</label>
+                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">CPF/Documento *</label>
+                    <input value={document} onChange={e => setDocument(e.target.value)} placeholder="Ex: 01234567890" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">Email</label>
+                    <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Ex: joao@email.com" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-500 block mb-1">Telefone</label>
+                    <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Apenas números" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500/50" />
+                </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer mb-2">
+                <input type="checkbox" checked={notValidationDuplicated} onChange={e => setNotValidationDuplicated(e.target.checked)} className="rounded border-white/10 bg-black/40 text-purple-600 focus:ring-purple-500/50" />
+                <span className="select-none">notValidationDuplicated <i className="text-gray-500">(enviar param para ignorar duplicidade)</i></span>
+            </label>
+
+            <button onClick={run} disabled={syncing || !name.trim() || !document.trim()} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm rounded-lg disabled:opacity-50 flex items-center gap-2">
+                {syncing ? '🔄 Consumindo API...' : '➕ Testar POST /customer'}
+            </button>
+
+            {result && (
+                <div className={`rounded-lg border p-4 text-xs space-y-2 mt-4 ${result.ok ? 'bg-primary/10 border-primary/20' : result.http_status === 409 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <div className="flex items-center gap-2 font-bold text-sm">
+                        {result.ok ? <span className="text-primary">✅ POST 201 Sucesso</span> : result.http_status === 409 ? <span className="text-yellow-400">⚠️ POST 409 Conflict</span> : <span className="text-red-400">❌ Erro</span>}
+                        <span className="text-gray-500 font-normal">HTTP {result.http_status}</span>
+                    </div>
+                    {result.payload_sent && (
+                        <div>
+                            <p className="text-gray-400 font-bold uppercase mb-1">Payload enviado:</p>
+                            <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto">{JSON.stringify(result.payload_sent, null, 2)}</pre>
+                        </div>
+                    )}
+                    <div>
+                        <p className="text-gray-400 font-bold uppercase mb-1">Resposta XGate:</p>
+                        <pre className="bg-black/40 rounded p-2 text-gray-300 overflow-x-auto whitespace-pre-wrap">{JSON.stringify(result.xgate_response || result.error, null, 2)}</pre>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function XGateDebugPage() {
     const [report, setReport] = useState<any>(null);
@@ -295,8 +380,8 @@ export default function XGateDebugPage() {
                                     <div className="space-y-2">
                                         {discoverResult.report.customer_lookup_by_transaction_id.map((r: any, i: number) => (
                                             <div key={i} className={`rounded-lg p-3 text-xs space-y-2 border ${r.try_as_customer_id?.['GET /customer/{id}']?.ok
-                                                    ? 'bg-primary/10 border-primary/20'
-                                                    : 'bg-black/30 border-white/5'
+                                                ? 'bg-primary/10 border-primary/20'
+                                                : 'bg-black/30 border-white/5'
                                                 }`}>
                                                 <div className="flex items-center justify-between flex-wrap gap-2">
                                                     <code className="text-gray-400">{r.xgate_transaction_id}</code>
@@ -318,7 +403,7 @@ export default function XGateDebugPage() {
                                                         <div className="bg-black/30 rounded p-1.5">
                                                             <span className="text-gray-500">CPF na XGate:</span>
                                                             <div className={`font-bold ${r.try_as_customer_id.customer_data.document === '12345678909' || r.try_as_customer_id.customer_data.document === '00000000000'
-                                                                    ? 'text-red-400' : 'text-primary'
+                                                                ? 'text-red-400' : 'text-primary'
                                                                 }`}>{r.try_as_customer_id.customer_data.document || '—'}</div>
                                                         </div>
                                                     </div>
@@ -417,16 +502,30 @@ export default function XGateDebugPage() {
                 </div>
             )}
 
-            {/* ── MANUAL SYNC PANEL ── */}
-            <div className="bg-surface border border-amber-500/20 rounded-xl p-5 space-y-4">
-                <div>
-                    <h2 className="font-bold text-white">🔧 Sync Manual por Customer ID</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                        Para usuários sem ID capturado: cole o Customer ID do painel XGate e selecione o usuário.
-                    </p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* ── MANUAL SYNC PANEL ── */}
+                <div className="bg-surface border border-amber-500/20 rounded-xl p-5 space-y-4">
+                    <div>
+                        <h2 className="font-bold text-white">🔧 Sync Manual por Customer ID</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            Para usuários sem ID capturado: cole o Customer ID do painel XGate e selecione o usuário.
+                        </p>
+                    </div>
+
+                    <ManualSyncForm users={users} />
                 </div>
 
-                <ManualSyncForm users={users} />
+                {/* ── CREATE CUSTOMER TEST PANEL ── */}
+                <div className="bg-surface border border-purple-500/20 rounded-xl p-5 space-y-4">
+                    <div>
+                        <h2 className="font-bold text-white flex items-center gap-2">➕ Testar Criação (POST /customer)</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            Suporte da XGate sugeriu que tentar criar com mesmo Nome/CPF deve retornar erro 409 + o ID do cliente.
+                        </p>
+                    </div>
+
+                    <CreateCustomerForm />
+                </div>
             </div>
 
             {/* ENV Check */}
