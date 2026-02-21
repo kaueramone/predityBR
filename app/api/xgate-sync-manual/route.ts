@@ -11,7 +11,6 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        // Accept either: explicit xgateCustomerId (already a real _id), or lookup via userId
         const { xgateCustomerId, transactionId, userId, name, email, document, phone } = body;
 
         let payload: Record<string, string> = {};
@@ -30,7 +29,6 @@ export async function POST(req: Request) {
                 if (user.phone) payload.phone = user.phone;
             }
         }
-        // Manual overrides
         if (document) payload.document = document.replace(/\D/g, '');
         if (name) payload.name = name;
         if (email) payload.email = email;
@@ -38,7 +36,7 @@ export async function POST(req: Request) {
 
         if (!payload.document) return NextResponse.json({ error: 'CPF (document) obrigatório' }, { status: 400 });
 
-        // Authenticate
+        // Auth
         const authRes = await fetch(`${BASE_URL}/auth/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -47,34 +45,34 @@ export async function POST(req: Request) {
         const { token } = await authRes.json();
         if (!token) return NextResponse.json({ error: 'XGate auth failed' }, { status: 500 });
 
-        // Resolve real customer _id
-        // If xgateCustomerId was provided, try using it directly first.
-        // If that returns 404/400, treat it as a transaction ID and resolve via GET.
         let realCustomerId = xgateCustomerId || transactionId;
+        let getStatus: number | null = null;
+        let getBody: any = null;
 
         if (realCustomerId) {
             // GET /customer/{id} to resolve the real _id for PUT
             const getRes = await fetch(`${BASE_URL}/customer/${realCustomerId}`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
-            const getBody = getRes.ok ? await getRes.json().catch(() => null) : null;
-            console.log(`[xgate-sync-manual] GET /customer/${realCustomerId} → ${getRes.status}`, JSON.stringify(getBody));
+            getStatus = getRes.status;
+            getBody = await getRes.json().catch(() => null);
 
             if (getBody && getBody._id) {
-                realCustomerId = getBody._id;
+                realCustomerId = getBody._id;  // use the real customer _id
             } else if (!getRes.ok) {
                 return NextResponse.json({
                     ok: false,
-                    error: `GET /customer/${realCustomerId} retornou HTTP ${getRes.status}`,
-                    raw_get_body: getBody,
+                    error: `GET /customer retornou HTTP ${getRes.status}`,
+                    get_status: getStatus,
+                    get_body: getBody,
+                    input_id: xgateCustomerId || transactionId,
                 });
             }
-            // If getBody is null or missing _id, keep the original ID and try PUT anyway
         }
 
         if (!realCustomerId) return NextResponse.json({ error: 'Customer ID não encontrado' }, { status: 400 });
 
-        // PUT with real _id
+        // PUT /customer/{realCustomerId}
         const res = await fetch(`${BASE_URL}/customer/${realCustomerId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -85,7 +83,16 @@ export async function POST(req: Request) {
         return NextResponse.json({
             ok: res.ok,
             http_status: res.status,
-            real_customer_id: realCustomerId,
+            // Debug info — shows exactly what happened
+            input_id: xgateCustomerId || transactionId,
+            get_status: getStatus,
+            get_customer_found: getBody ? {
+                _id: getBody._id,
+                email: getBody.email,
+                name: getBody.name,
+                document: getBody.document,
+            } : null,
+            real_customer_id_used_for_put: realCustomerId,
             payload_sent: payload,
             xgate_response: resBody,
         });
